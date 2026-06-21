@@ -1,7 +1,8 @@
 'use client';
 
-import { useState, useMemo } from 'react';
-import { ExternalLink, AlertTriangle, Info, Search } from 'lucide-react';
+import { useState, useMemo, useTransition } from 'react';
+import { ExternalLink, AlertTriangle, Info, Search, RefreshCw } from 'lucide-react';
+import { syncShopeeProductsData } from '@/app/actions/products';
 import { cn } from '@/lib/utils';
 import { ShopeeProductData, Diagnosis, analyzeProduct } from '@/types';
 
@@ -159,6 +160,20 @@ export function ShopeeProductsPanel({ products }: ShopeeProductsPanelProps) {
   const [account, setAccount]   = useState('shopee-renan');
   const [sortBy, setSortBy]     = useState<keyof ShopeeProductData>('impressions');
   const [sortAsc, setSortAsc]   = useState(false);
+  const [syncMsg, setSyncMsg]   = useState<{ ok: boolean; text: string } | null>(null);
+  const [isSyncing, startSync]  = useTransition();
+
+  function handleSync() {
+    setSyncMsg(null);
+    startSync(async () => {
+      const result = await syncShopeeProductsData(account, dateFrom, dateTo);
+      setSyncMsg(
+        result.error
+          ? { ok: false, text: `Erro: ${result.error}` }
+          : { ok: true,  text: `${result.synced} produto${result.synced !== 1 ? 's' : ''} sincronizado${result.synced !== 1 ? 's' : ''}` },
+      );
+    });
+  }
 
   const rows = products.length > 0 ? products : MOCK;
 
@@ -237,6 +252,24 @@ export function ShopeeProductsPanel({ products }: ShopeeProductsPanelProps) {
                 {warningCount} em atenção
               </span>
             )}
+
+            {syncMsg && (
+              <span className={cn(
+                'text-xs font-medium px-2 py-1 rounded-md',
+                syncMsg.ok ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700',
+              )}>
+                {syncMsg.text}
+              </span>
+            )}
+
+            <button
+              onClick={handleSync}
+              disabled={isSyncing}
+              className="inline-flex items-center gap-1.5 rounded-lg bg-orange-500 px-3 py-2 text-xs font-semibold text-white hover:bg-orange-600 disabled:opacity-60 transition-colors"
+            >
+              <RefreshCw className={cn('h-3.5 w-3.5', isSyncing && 'animate-spin')} />
+              {isSyncing ? 'Sincronizando...' : 'Sincronizar Dados'}
+            </button>
           </div>
         </div>
       </div>
