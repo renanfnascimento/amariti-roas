@@ -8,6 +8,8 @@ export async function getShopeeProducts(
   dateFrom?: string,
   dateTo?: string,
 ): Promise<ShopeeProductData[]> {
+  if (!supabase) return [];
+
   let query = supabase
     .from('shopee_product_metrics')
     .select(`
@@ -39,9 +41,10 @@ export async function getShopeeProducts(
     return [];
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   return (data ?? []).map((row: any) => ({
     shopee_product_id: row.shopee_product_id,
-    product_name:      row.shopee_products?.name ?? '—',
+    product_name:      row.shopee_products?.name  ?? '—',
     price:             row.shopee_products?.price ?? 0,
     account:           row.account,
     date:              row.date,

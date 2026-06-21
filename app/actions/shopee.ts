@@ -5,6 +5,8 @@ import { supabase } from '@/lib/supabase';
 import { ShopeeMetricsRow } from '@/types';
 
 export async function getShopeeMetrics(): Promise<ShopeeMetricsRow[]> {
+  if (!supabase) return [];
+
   const { data, error } = await supabase
     .from('shopee_metrics')
     .select(`
@@ -34,6 +36,8 @@ export async function getShopeeMetrics(): Promise<ShopeeMetricsRow[]> {
 }
 
 export async function updateCampaignBudget(id: string, newBudget: number): Promise<void> {
+  if (!supabase) throw new Error('Supabase client not initialized');
+
   const { error } = await supabase
     .from('campaigns')
     .update({ daily_budget: newBudget })
