@@ -13,10 +13,10 @@ interface ShopeeConfig {
 
 function getConfig(): ShopeeConfig {
   return {
-    partnerId:   Number(process.env.SHOPEE_PARTNER_ID   ?? '0'),
-    partnerKey:  process.env.SHOPEE_PARTNER_KEY          ?? '',
-    shopId:      Number(process.env.SHOPEE_SHOP_ID       ?? '0'),
-    accessToken: process.env.SHOPEE_ACCESS_TOKEN         ?? '',
+    partnerId:   Number((process.env.SHOPEE_PARTNER_ID   ?? '').trim() || '0'),
+    partnerKey:  (process.env.SHOPEE_PARTNER_KEY          ?? '').trim(),
+    shopId:      Number((process.env.SHOPEE_SHOP_ID       ?? '').trim() || '0'),
+    accessToken: (process.env.SHOPEE_ACCESS_TOKEN         ?? '').trim(),
   };
 }
 
