@@ -91,6 +91,7 @@ export function CampaignTable({ rows }: CampaignTableProps) {
       </div>
 
       <QuickEditCampaignDialog
+        key={selected?.campaign_id ?? 'none'}
         open={open}
         onOpenChange={setOpen}
         campaignId={selected?.campaign_id ?? null}

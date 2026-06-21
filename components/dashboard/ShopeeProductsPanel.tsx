@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useMemo } from 'react';
-import { ExternalLink, AlertTriangle, CheckCircle, Info, Search } from 'lucide-react';
+import { ExternalLink, AlertTriangle, Info, Search } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { ShopeeProductData, Diagnosis, analyzeProduct } from '@/types';
 
@@ -112,6 +112,29 @@ function DiagnosisTags({ diagnoses }: { diagnoses: Diagnosis[] }) {
   );
 }
 
+// Componente de cabeçalho de coluna ordenável — deve ficar FORA do render
+interface ThSortableProps {
+  col: keyof ShopeeProductData;
+  label: string;
+  right?: boolean;
+  sortBy: keyof ShopeeProductData;
+  sortAsc: boolean;
+  onSort: (col: keyof ShopeeProductData) => void;
+}
+function ThSortable({ col, label, right, sortBy, sortAsc, onSort }: ThSortableProps) {
+  return (
+    <th
+      onClick={() => onSort(col)}
+      className={cn(
+        'px-3 py-3 text-[11px] font-semibold uppercase tracking-wide text-gray-400 cursor-pointer select-none whitespace-nowrap hover:text-gray-700 transition-colors',
+        right ? 'text-right' : 'text-left',
+      )}
+    >
+      {label} {sortBy === col ? (sortAsc ? '↑' : '↓') : ''}
+    </th>
+  );
+}
+
 function SummaryCard({ label, value, sub }: { label: string; value: string; sub?: string }) {
   return (
     <div className="rounded-xl border border-gray-200 bg-white px-4 py-3 shadow-sm">
@@ -188,18 +211,6 @@ export function ShopeeProductsPanel({ products }: ShopeeProductsPanelProps) {
   }
 
   const selectClass = 'rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700 shadow-sm focus:outline-none focus:ring-2 focus:ring-orange-300 cursor-pointer';
-
-  const Th = ({ col, label, right }: { col: keyof ShopeeProductData; label: string; right?: boolean }) => (
-    <th
-      onClick={() => toggleSort(col)}
-      className={cn(
-        'px-3 py-3 text-[11px] font-semibold uppercase tracking-wide text-gray-400 cursor-pointer select-none whitespace-nowrap hover:text-gray-700 transition-colors',
-        right ? 'text-right' : 'text-left'
-      )}
-    >
-      {label} {sortBy === col ? (sortAsc ? '↑' : '↓') : ''}
-    </th>
-  );
 
   return (
     <div className="flex flex-col h-full bg-gray-50">
@@ -295,21 +306,21 @@ export function ShopeeProductsPanel({ products }: ShopeeProductsPanelProps) {
                 <tr>
                   <th className="px-3 py-3 text-left text-[11px] font-semibold uppercase tracking-wide text-gray-400 w-8">#</th>
                   <th className="px-3 py-3 text-left text-[11px] font-semibold uppercase tracking-wide text-gray-400 min-w-[240px]">Produto</th>
-                  <Th col="impressions"      label="Impressões"    right />
-                  <Th col="clicks"           label="Cliques"       right />
-                  <Th col="ctr"              label="CTR"           right />
-                  <Th col="product_visitors" label="Visitantes"    right />
-                  <Th col="cart_visitors"    label="Carrinho"      right />
-                  <Th col="cart_conv_rate"   label="Conv.Cart"     right />
-                  <Th col="orders"           label="Pedidos"       right />
-                  <Th col="units"            label="Unidades"      right />
-                  <Th col="order_conv_rate"  label="Conv.Ped."     right />
+                  <ThSortable col="impressions"      label="Impressões"    right sortBy={sortBy} sortAsc={sortAsc} onSort={toggleSort} />
+                  <ThSortable col="clicks"           label="Cliques"       right sortBy={sortBy} sortAsc={sortAsc} onSort={toggleSort} />
+                  <ThSortable col="ctr"              label="CTR"           right sortBy={sortBy} sortAsc={sortAsc} onSort={toggleSort} />
+                  <ThSortable col="product_visitors" label="Visitantes"    right sortBy={sortBy} sortAsc={sortAsc} onSort={toggleSort} />
+                  <ThSortable col="cart_visitors"    label="Carrinho"      right sortBy={sortBy} sortAsc={sortAsc} onSort={toggleSort} />
+                  <ThSortable col="cart_conv_rate"   label="Conv.Cart"     right sortBy={sortBy} sortAsc={sortAsc} onSort={toggleSort} />
+                  <ThSortable col="orders"           label="Pedidos"       right sortBy={sortBy} sortAsc={sortAsc} onSort={toggleSort} />
+                  <ThSortable col="units"            label="Unidades"      right sortBy={sortBy} sortAsc={sortAsc} onSort={toggleSort} />
+                  <ThSortable col="order_conv_rate"  label="Conv.Ped."     right sortBy={sortBy} sortAsc={sortAsc} onSort={toggleSort} />
                   <th className="px-3 py-3 text-left text-[11px] font-semibold uppercase tracking-wide text-gray-400 min-w-[180px]">Diagnóstico</th>
                   <th className="px-3 py-3 text-center text-[11px] font-semibold uppercase tracking-wide text-gray-400">Ação</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
-                {filtered.map((p, i) => (
+                {filtered.map((p) => (
                   <tr key={p.shopee_product_id} className="hover:bg-orange-50/30 transition-colors group">
 
                     {/* Prioridade */}

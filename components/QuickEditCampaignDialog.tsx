@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useTransition } from 'react';
+import { useState, useTransition } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -25,12 +25,10 @@ export function QuickEditCampaignDialog({
   campaignName,
   currentBudget,
 }: QuickEditCampaignDialogProps) {
+  // Initializa com o valor atual. O componente é re-montado via `key` no pai
+  // quando a campanha muda, então não precisamos de useEffect aqui.
   const [budget, setBudget] = useState(currentBudget);
   const [isPending, startTransition] = useTransition();
-
-  useEffect(() => {
-    setBudget(currentBudget);
-  }, [currentBudget]);
 
   function handleSave() {
     if (!campaignId) return;
