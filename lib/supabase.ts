@@ -1,18 +1,15 @@
 import { createClient } from '@supabase/supabase-js';
 
-// Turbopack inlines missing NEXT_PUBLIC_* vars as the string "undefined",
-// not JS undefined. Checking startsWith('https://') rejects every invalid
-// value ("undefined", "", " ", etc.) and falls back to a dummy URL so
-// createClient never throws during the Vercel static build phase.
-const DUMMY_URL = 'https://dummyproject.supabase.co';
-const DUMMY_KEY = 'dummy-anon-key';
+// Lazy getter — createClient is called inside functions at request time,
+// never at module evaluation (which runs during Vercel's build trace).
+// startsWith('https://') rejects "undefined" string that Turbopack inlines
+// for missing NEXT_PUBLIC_* vars, preventing the "malformed URL" crash.
+export const getSupabase = () => {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
-const rawUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? '';
-const rawKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? '';
+  const safeUrl = url?.startsWith('https://') ? url : 'https://placeholder.supabase.co';
+  const safeKey = key && key.length > 20 ? key : 'placeholder-key';
 
-const safeUrl = rawUrl.startsWith('https://') ? rawUrl : DUMMY_URL;
-const safeKey = rawKey.length > 20 ? rawKey : DUMMY_KEY;
-
-export const supabase = createClient(safeUrl, safeKey, { db: { schema: 'roas' } });
-
-export const hasCredentials = rawUrl.startsWith('https://') && rawKey.length > 20;
+  return createClient(safeUrl, safeKey, { db: { schema: 'roas' } });
+};
