@@ -34,3 +34,78 @@ export interface ShopeeMetricsRow {
     daily_budget: number;
   };
 }
+
+// ── Produto Analytics ─────────────────────────────────────────────────────────
+
+export interface ShopeeProductData {
+  shopee_product_id: string;
+  product_name: string;
+  price: number;
+  account: string;
+  date: string;
+  impressions: number;
+  clicks: number;
+  orders: number;
+  units: number;
+  product_visitors: number;
+  cart_visitors: number;
+  revenue: number;
+  ctr: number;
+  order_conv_rate: number;
+  cart_conv_rate: number;
+}
+
+export type DiagnosisType = 'critical' | 'warning' | 'ok';
+
+export interface Diagnosis {
+  type: DiagnosisType;
+  category: 'ctr' | 'conversion' | 'cart' | 'volume';
+  label: string;
+  action: string;
+  icon: string;
+}
+
+export function analyzeProduct(p: ShopeeProductData): Diagnosis[] {
+  const result: Diagnosis[] = [];
+
+  // CTR — analisar só com volume >= 100 impressões
+  if (p.impressions >= 100) {
+    if (p.ctr < 2.0) {
+      result.push({ type: 'critical', category: 'ctr',
+        label: 'CTR Crítico', action: 'Trocar foto de capa urgente', icon: '📸' });
+    } else if (p.ctr < 4.0) {
+      result.push({ type: 'warning', category: 'ctr',
+        label: 'CTR Baixo', action: 'Testar nova capa ou título', icon: '🖼️' });
+    }
+  }
+
+  // Conversão de Pedidos — com >= 20 cliques
+  if (p.clicks >= 20) {
+    if (p.order_conv_rate < 1.0) {
+      result.push({ type: 'critical', category: 'conversion',
+        label: 'Conv. Crítica', action: 'Verificar estoque e sazonalidade', icon: '📦' });
+    } else if (p.order_conv_rate < 2.5) {
+      result.push({ type: 'warning', category: 'conversion',
+        label: 'Conv. Baixa', action: 'Revisar preço ou descrição', icon: '💰' });
+    }
+  }
+
+  // Abandono de carrinho — com >= 5 adições e conv baixa
+  if (p.cart_visitors >= 5) {
+    const cartToPurchase = p.cart_visitors > 0
+      ? (p.orders / p.cart_visitors) * 100
+      : 0;
+    if (cartToPurchase < 20) {
+      result.push({ type: 'warning', category: 'cart',
+        label: 'Abandono Carrinho', action: 'Revisar frete e parcelamento', icon: '🛒' });
+    }
+  }
+
+  // Volume muito baixo — sem diagnóstico de CTR/Conv confiável
+  if (p.impressions > 0 && p.impressions < 100 && result.length === 0) {
+    result.push({ type: 'ok', category: 'volume',
+      label: 'Volume Baixo', action: 'Aguardar mais dados', icon: '📊' });
+  }
+
+  return result;
+}
