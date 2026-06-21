@@ -1,6 +1,6 @@
 'use server';
 
-import { supabase } from '@/lib/supabase';
+import { supabase, hasCredentials } from '@/lib/supabase';
 import { ShopeeProductData } from '@/types';
 
 export async function getShopeeProducts(
@@ -8,7 +8,7 @@ export async function getShopeeProducts(
   dateFrom?: string,
   dateTo?: string,
 ): Promise<ShopeeProductData[]> {
-  if (!supabase) return [];
+  if (!hasCredentials) return [];
 
   let query = supabase
     .from('shopee_product_metrics')

@@ -1,11 +1,11 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
-import { supabase } from '@/lib/supabase';
+import { supabase, hasCredentials } from '@/lib/supabase';
 import { ShopeeMetricsRow } from '@/types';
 
 export async function getShopeeMetrics(): Promise<ShopeeMetricsRow[]> {
-  if (!supabase) return [];
+  if (!hasCredentials) return [];
 
   const { data, error } = await supabase
     .from('shopee_metrics')
@@ -36,7 +36,7 @@ export async function getShopeeMetrics(): Promise<ShopeeMetricsRow[]> {
 }
 
 export async function updateCampaignBudget(id: string, newBudget: number): Promise<void> {
-  if (!supabase) throw new Error('Supabase client not initialized');
+  if (!hasCredentials) throw new Error('Supabase client not initialized');
 
   const { error } = await supabase
     .from('campaigns')
