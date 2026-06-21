@@ -6,6 +6,8 @@ import { getShopeeItemPerformance } from '@/lib/shopee';
 import { ShopeeProductData } from '@/types';
 
 // ── Leitura ───────────────────────────────────────────────────────────────────
+// Schema real: shopee_product_metrics.product_id BIGINT FK → shopee_products.product_id
+// Campo de visitantes na tabela: "visitors" (não "product_visitors")
 
 export async function getShopeeProducts(
   account = 'shopee-renan',
@@ -17,22 +19,14 @@ export async function getShopeeProducts(
   let query = supabase
     .from('shopee_product_metrics')
     .select(`
-      shopee_product_id,
-      account,
+      product_id,
       date,
       impressions,
       clicks,
       orders,
-      units,
-      product_visitors,
-      cart_visitors,
-      revenue,
-      ctr,
-      order_conv_rate,
-      cart_conv_rate,
+      visitors,
       shopee_products!inner(name, price)
     `)
-    .eq('account', account)
     .order('impressions', { ascending: false });
 
   if (dateFrom) query = query.gte('date', dateFrom);
@@ -47,21 +41,25 @@ export async function getShopeeProducts(
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   return (data ?? []).map((row: any) => ({
-    shopee_product_id: row.shopee_product_id,
+    shopee_product_id: String(row.product_id),
     product_name:      row.shopee_products?.name  ?? '—',
     price:             row.shopee_products?.price ?? 0,
-    account:           row.account,
+    account,
     date:              row.date,
-    impressions:       row.impressions,
-    clicks:            row.clicks,
-    orders:            row.orders,
-    units:             row.units,
-    product_visitors:  row.product_visitors,
-    cart_visitors:     row.cart_visitors,
-    revenue:           row.revenue,
-    ctr:               row.ctr,
-    order_conv_rate:   row.order_conv_rate,
-    cart_conv_rate:    row.cart_conv_rate,
+    impressions:       row.impressions    ?? 0,
+    clicks:            row.clicks         ?? 0,
+    orders:            row.orders         ?? 0,
+    units:             0,
+    product_visitors:  row.visitors       ?? 0,
+    cart_visitors:     0,
+    revenue:           0,
+    ctr:               (row.impressions ?? 0) > 0
+                         ? ((row.clicks ?? 0) / row.impressions) * 100
+                         : 0,
+    order_conv_rate:   (row.visitors ?? 0) > 0
+                         ? ((row.orders ?? 0) / row.visitors) * 100
+                         : 0,
+    cart_conv_rate:    0,
   }));
 }
 
@@ -72,10 +70,10 @@ export async function syncShopeeProductsData(
   dateFrom?: string,
   dateTo?: string,
 ): Promise<{ synced: number; error?: string }> {
-  const today    = new Date().toISOString().split('T')[0];
-  const weekAgo  = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-  const from     = dateFrom ?? weekAgo;
-  const to       = dateTo   ?? today;
+  const today   = new Date().toISOString().split('T')[0];
+  const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+  const from    = dateFrom ?? weekAgo;
+  const to      = dateTo   ?? today;
 
   try {
     const items = await getShopeeItemPerformance(from, to);
@@ -83,40 +81,33 @@ export async function syncShopeeProductsData(
 
     const supabase = getSupabase();
 
-    // Upsert produtos (dimensão)
+    // Upsert produtos — product_id BIGINT é a chave real no Supabase
     const { error: prodErr } = await supabase
       .from('shopee_products')
       .upsert(
         items.map((i) => ({
-          shopee_product_id: String(i.item_id),
-          name:              i.item_name,
-          price:             i.price,
+          product_id: i.item_id,      // BIGINT — número direto da Shopee
+          name:       i.item_name,
+          price:      i.price,
         })),
-        { onConflict: 'shopee_product_id' },
+        { onConflict: 'product_id' },
       );
 
     if (prodErr) throw new Error(prodErr.message);
 
-    // Upsert métricas (fatos por dia)
+    // Upsert métricas — chave: (product_id, date)
     const { error: metErr } = await supabase
       .from('shopee_product_metrics')
       .upsert(
         items.map((i) => ({
-          shopee_product_id: String(i.item_id),
-          account,
-          date:              to,
-          impressions:       i.impressions,
-          clicks:            i.clicks,
-          orders:            i.orders,
-          units:             i.units,
-          product_visitors:  i.product_visitors,
-          cart_visitors:     i.cart_visitors,
-          revenue:           i.revenue,
-          ctr:               i.ctr,
-          order_conv_rate:   i.order_conv_rate,
-          cart_conv_rate:    i.cart_conv_rate,
+          product_id:  i.item_id,
+          date:        to,
+          impressions: i.impressions,
+          clicks:      i.clicks,
+          orders:      i.orders,
+          visitors:    i.product_visitors,   // "visitors" = coluna real na tabela
         })),
-        { onConflict: 'shopee_product_id,date' },
+        { onConflict: 'product_id,date' },
       );
 
     if (metErr) throw new Error(metErr.message);
