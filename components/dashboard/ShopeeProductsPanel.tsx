@@ -175,7 +175,9 @@ export function ShopeeProductsPanel({ products }: ShopeeProductsPanelProps) {
     });
   }
 
-  const rows = products.length > 0 ? products : MOCK;
+  // Usa dados reais do BD; MOCK só quando não há nenhum produto (modo demo local)
+  const isDemo = products.length === 0;
+  const rows   = isDemo ? MOCK : products;
 
   const enriched = useMemo(() => {
     return rows.map((p) => ({ ...p, diagnoses: analyzeProduct(p) }));
@@ -306,7 +308,9 @@ export function ShopeeProductsPanel({ products }: ShopeeProductsPanelProps) {
         </div>
 
         <span className="ml-auto text-[11px] text-gray-400 font-medium">
-          {products.length > 0 ? `${filtered.length} de ${enriched.length} produtos (BD)` : `${filtered.length} de ${enriched.length} produtos (demo)`}
+          {isDemo
+            ? `${filtered.length} de ${enriched.length} produtos (demo)`
+            : `${filtered.length} de ${enriched.length} produtos (BD)`}
         </span>
       </div>
 
@@ -448,7 +452,9 @@ export function ShopeeProductsPanel({ products }: ShopeeProductsPanelProps) {
                 {filtered.length === 0 && (
                   <tr>
                     <td colSpan={13} className="px-4 py-12 text-center text-sm text-gray-400">
-                      Nenhum produto encontrado com os filtros aplicados.
+                      {isDemo
+                        ? 'Nenhum dado encontrado. Clique em Sincronizar.'
+                        : 'Nenhum produto encontrado com os filtros aplicados.'}
                     </td>
                   </tr>
                 )}

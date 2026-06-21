@@ -14,53 +14,59 @@ export async function getShopeeProducts(
   dateFrom?: string,
   dateTo?: string,
 ): Promise<ShopeeProductData[]> {
-  const supabase = getSupabase();
+  try {
+    const supabase = getSupabase();
 
-  let query = supabase
-    .from('shopee_product_metrics')
-    .select(`
-      product_id,
-      date,
-      impressions,
-      clicks,
-      orders,
-      visitors,
-      shopee_products!inner(name, price)
-    `)
-    .order('impressions', { ascending: false });
+    let query = supabase
+      .from('shopee_product_metrics')
+      .select(`
+        product_id,
+        date,
+        impressions,
+        clicks,
+        orders,
+        visitors,
+        shopee_products!inner(name, price)
+      `)
+      .order('impressions', { ascending: false });
 
-  if (dateFrom) query = query.gte('date', dateFrom);
-  if (dateTo)   query = query.lte('date', dateTo);
+    if (dateFrom) query = query.gte('date', dateFrom);
+    if (dateTo)   query = query.lte('date', dateTo);
 
-  const { data, error } = await query;
+    const { data, error } = await query;
 
-  if (error) {
-    console.error('[getShopeeProducts]', error.message);
+    if (error) {
+      console.error('ERRO REAL SSR:', error);
+      return [];
+    }
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return (data ?? []).map((row: any) => ({
+      shopee_product_id: String(row.product_id),
+      product_name:      row.shopee_products?.name  ?? '—',
+      price:             row.shopee_products?.price ?? 0,
+      account,
+      date:              row.date,
+      impressions:       row.impressions    ?? 0,
+      clicks:            row.clicks         ?? 0,
+      orders:            row.orders         ?? 0,
+      units:             0,
+      product_visitors:  row.visitors       ?? 0,
+      cart_visitors:     0,
+      revenue:           0,
+      ctr:               (row.impressions ?? 0) > 0
+                           ? ((row.clicks ?? 0) / row.impressions) * 100
+                           : 0,
+      order_conv_rate:   (row.visitors ?? 0) > 0
+                           ? ((row.orders ?? 0) / row.visitors) * 100
+                           : 0,
+      cart_conv_rate:    0,
+    }));
+
+  } catch (error) {
+    console.error('ERRO REAL SSR:', error);
     return [];
   }
-
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  return (data ?? []).map((row: any) => ({
-    shopee_product_id: String(row.product_id),
-    product_name:      row.shopee_products?.name  ?? '—',
-    price:             row.shopee_products?.price ?? 0,
-    account,
-    date:              row.date,
-    impressions:       row.impressions    ?? 0,
-    clicks:            row.clicks         ?? 0,
-    orders:            row.orders         ?? 0,
-    units:             0,
-    product_visitors:  row.visitors       ?? 0,
-    cart_visitors:     0,
-    revenue:           0,
-    ctr:               (row.impressions ?? 0) > 0
-                         ? ((row.clicks ?? 0) / row.impressions) * 100
-                         : 0,
-    order_conv_rate:   (row.visitors ?? 0) > 0
-                         ? ((row.orders ?? 0) / row.visitors) * 100
-                         : 0,
-    cart_conv_rate:    0,
-  }));
 }
 
 // ── Sincronização com a Shopee Open Platform ──────────────────────────────────
