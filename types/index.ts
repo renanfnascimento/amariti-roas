@@ -17,3 +17,20 @@ export interface ShopeeMetrics {
   roas_calculado: number;
   margem_contribuicao: number;
 }
+
+export interface ShopeeMetricsRow {
+  id: string;
+  campaign_id: string;
+  date: string;
+  ad_spend: number;
+  revenue: number;
+  roas: number;
+  contribution_margin: number;
+  campaigns: {
+    id: string;
+    platform: string;
+    name: string;
+    status: boolean;
+    daily_budget: number;
+  };
+}
