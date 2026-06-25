@@ -28,7 +28,8 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
 
   return (
     <div className="flex h-screen bg-gray-50">
-      <aside className="w-60 flex-shrink-0 bg-gray-900 text-gray-100 flex flex-col">
+      {/* Sidebar — somente desktop */}
+      <aside className="hidden md:flex w-60 flex-shrink-0 bg-gray-900 text-gray-100 flex-col">
         <div className="px-6 py-5 border-b border-gray-700">
           <span className="text-lg font-bold tracking-tight text-white">
             Amariti ROAS
@@ -55,9 +56,28 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
           <p className="text-xs text-gray-500">v0.1.0 — Setup Inicial</p>
         </div>
       </aside>
-      <main className="flex-1 overflow-auto">
+
+      {/* Conteúdo principal */}
+      <main className="flex-1 overflow-auto pb-16 md:pb-0">
         {children}
       </main>
+
+      {/* Bottom nav — somente mobile */}
+      <nav className="md:hidden fixed bottom-0 inset-x-0 bg-gray-900 border-t border-gray-700 flex items-center justify-around z-50">
+        {navItems.map(({ href, label, icon: Icon }) => (
+          <Link
+            key={href}
+            href={href}
+            className={cn(
+              'flex flex-col items-center gap-0.5 px-2 py-2 text-[10px] font-medium transition-colors',
+              pathname === href ? 'text-orange-400' : 'text-gray-400'
+            )}
+          >
+            <Icon className="h-5 w-5" />
+            <span className="truncate max-w-[50px] text-center leading-tight">{label}</span>
+          </Link>
+        ))}
+      </nav>
     </div>
   );
 }
