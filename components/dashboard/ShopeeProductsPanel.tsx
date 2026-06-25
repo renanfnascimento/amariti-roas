@@ -5,6 +5,16 @@ import { ExternalLink, AlertTriangle, Info, Search, RefreshCw } from 'lucide-rea
 import { syncShopeeProductsData } from '@/app/actions/products';
 import { cn } from '@/lib/utils';
 import { ShopeeProductData, Diagnosis, analyzeProduct } from '@/types';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+
+// ── Configuração de Lojas ─────────────────────────────────────────────────────
+
+const STORES = {
+  loja1: { label: 'Loja 1 · Renan',   account: 'shopee-renan'   },
+  loja2: { label: 'Loja 2 · Amariti', account: 'shopee-amariti' },
+} as const;
+
+type StoreKey = keyof typeof STORES;
 
 // ── Fallback mock (dados reais do Gestor) ─────────────────────────────────────
 
@@ -157,7 +167,8 @@ export function ShopeeProductsPanel({ products }: ShopeeProductsPanelProps) {
   const [filterAlert, setFilterAlert] = useState<'all' | 'critical' | 'warning'>('all');
   const [dateFrom, setDateFrom] = useState('2026-06-01');
   const [dateTo, setDateTo]     = useState('2026-06-21');
-  const [account, setAccount]   = useState('shopee-renan');
+  const [selectedStore, setSelectedStore] = useState<StoreKey>('loja1');
+  const account = STORES[selectedStore].account;
   const [sortBy, setSortBy]     = useState<keyof ShopeeProductData>('impressions');
   const [sortAsc, setSortAsc]   = useState(false);
   const [syncMsg, setSyncMsg]   = useState<{ ok: boolean; text: string } | null>(null);
@@ -233,19 +244,40 @@ export function ShopeeProductsPanel({ products }: ShopeeProductsPanelProps) {
     <div className="flex flex-col h-full bg-gray-50">
 
       {/* Header */}
-      <div className="px-8 pt-7 pb-1">
-        <div className="flex items-center justify-between">
+      <div className="px-4 pt-4 pb-1 md:px-8 md:pt-7">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          {/* Título */}
           <div>
-            <h1 className="text-xl font-bold text-gray-900">Inteligência de Produtos — Shopee</h1>
+            <h1 className="text-lg font-bold text-gray-900 md:text-xl">Inteligência de Produtos — Shopee</h1>
             <p className="text-xs text-gray-400 mt-0.5">
-              Orgânico + Pago · Conta: <span className="font-semibold text-gray-600">Shopee Renan</span>
+              Orgânico + Pago · <span className="font-semibold text-gray-600">{STORES[selectedStore].label}</span>
             </p>
           </div>
-          <div className="flex items-center gap-2">
+
+          {/* Seletor de Loja */}
+          <Tabs value={selectedStore} onValueChange={(v) => setSelectedStore(v as StoreKey)}>
+            <TabsList className="bg-orange-50 border border-orange-200 h-9">
+              <TabsTrigger
+                value="loja1"
+                className="text-xs data-[state=active]:bg-orange-500 data-[state=active]:text-white"
+              >
+                Loja 1 · Renan
+              </TabsTrigger>
+              <TabsTrigger
+                value="loja2"
+                className="text-xs data-[state=active]:bg-orange-500 data-[state=active]:text-white"
+              >
+                Loja 2 · Amariti
+              </TabsTrigger>
+            </TabsList>
+          </Tabs>
+
+          {/* Alertas + Sincronizar */}
+          <div className="flex flex-wrap items-center gap-2">
             {criticalCount > 0 && (
               <span className="inline-flex items-center gap-1.5 rounded-full bg-red-100 px-3 py-1 text-xs font-semibold text-red-700">
                 <AlertTriangle className="h-3.5 w-3.5" />
-                {criticalCount} produto{criticalCount > 1 ? 's' : ''} crítico{criticalCount > 1 ? 's' : ''}
+                {criticalCount} crítico{criticalCount > 1 ? 's' : ''}
               </span>
             )}
             {warningCount > 0 && (
@@ -270,25 +302,20 @@ export function ShopeeProductsPanel({ products }: ShopeeProductsPanelProps) {
               className="inline-flex items-center gap-1.5 rounded-lg bg-orange-500 px-3 py-2 text-xs font-semibold text-white hover:bg-orange-600 disabled:opacity-60 transition-colors"
             >
               <RefreshCw className={cn('h-3.5 w-3.5', isSyncing && 'animate-spin')} />
-              {isSyncing ? 'Sincronizando...' : 'Sincronizar Dados'}
+              {isSyncing ? 'Sincronizando...' : 'Sincronizar'}
             </button>
           </div>
         </div>
       </div>
 
       {/* Filtros */}
-      <div className="px-8 py-4 flex flex-wrap items-center gap-3 border-b border-gray-200 bg-white shadow-sm">
-        <div className="flex items-center gap-2">
+      <div className="px-4 py-3 flex flex-wrap items-center gap-3 border-b border-gray-200 bg-white shadow-sm md:px-8 md:py-4">
+        <div className="flex flex-wrap items-center gap-2">
           <label className="text-xs font-medium text-gray-500">De</label>
           <input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className={selectClass} />
           <label className="text-xs font-medium text-gray-500">até</label>
           <input type="date" value={dateTo}   onChange={(e) => setDateTo(e.target.value)}   className={selectClass} />
         </div>
-
-        <select value={account} onChange={(e) => setAccount(e.target.value)} className={selectClass}>
-          <option value="shopee-renan">Shopee Renan</option>
-          <option value="shopee-amariti">Shopee Amariti</option>
-        </select>
 
         <select value={filterAlert} onChange={(e) => setFilterAlert(e.target.value as typeof filterAlert)} className={selectClass}>
           <option value="all">Todos os alertas</option>
@@ -296,7 +323,7 @@ export function ShopeeProductsPanel({ products }: ShopeeProductsPanelProps) {
           <option value="warning">🟡 Com atenção</option>
         </select>
 
-        <div className="relative flex-1 min-w-[200px]">
+        <div className="relative flex-1 min-w-[160px]">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-gray-400" />
           <input
             type="text"
@@ -307,14 +334,14 @@ export function ShopeeProductsPanel({ products }: ShopeeProductsPanelProps) {
           />
         </div>
 
-        <span className="ml-auto text-[11px] text-gray-400 font-medium">
+        <span className="text-[11px] text-gray-400 font-medium">
           {isDemo
-            ? `${filtered.length} de ${enriched.length} produtos (demo)`
-            : `${filtered.length} de ${enriched.length} produtos (BD)`}
+            ? `${filtered.length}/${enriched.length} (demo)`
+            : `${filtered.length}/${enriched.length} (BD)`}
         </span>
       </div>
 
-      <div className="flex-1 overflow-auto px-8 py-6 space-y-5">
+      <div className="flex-1 overflow-auto px-4 py-4 space-y-4 md:px-8 md:py-6 md:space-y-5">
 
         {/* KPI Summary */}
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
