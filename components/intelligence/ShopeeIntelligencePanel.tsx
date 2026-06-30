@@ -3,10 +3,11 @@
 import { useState, useEffect, useMemo, useTransition } from 'react';
 import {
   RefreshCw, TrendingUp, TrendingDown, Activity,
-  Settings2, Zap,
+  Settings2, Zap, UploadCloud,
 } from 'lucide-react';
 import { getSupabase } from '@/lib/supabase';
 import { cn } from '@/lib/utils';
+import { CsvUploader } from './CsvUploader';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -128,6 +129,7 @@ export function ShopeeIntelligencePanel({ shopId1, shopId2 }: ShopeeIntelligence
   const [period,         setPeriod]         = useState<Period>('7d');
   const [scaleThreshold, setScaleThreshold] = useState(3.0);
   const [showConfig,     setShowConfig]     = useState(false);
+  const [showUploader,   setShowUploader]   = useState(false);
   const [lastRefresh,    setLastRefresh]    = useState<Date | null>(null);
   const [pendingIds,     setPendingIds]     = useState<Set<string>>(new Set());
   const [, startT] = useTransition();
@@ -230,7 +232,19 @@ export function ShopeeIntelligencePanel({ shopId1, shopId2 }: ShopeeIntelligence
           </div>
           <div className="flex items-center gap-2">
             <button
-              onClick={() => setShowConfig(v => !v)}
+              onClick={() => { setShowUploader(v => !v); setShowConfig(false); }}
+              className={cn(
+                'inline-flex items-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-semibold transition-colors',
+                showUploader
+                  ? 'border-orange-300 bg-orange-50 text-orange-700'
+                  : 'border-gray-200 bg-white text-gray-600 hover:bg-gray-50',
+              )}
+            >
+              <UploadCloud className="h-3.5 w-3.5" />
+              Importar CSV
+            </button>
+            <button
+              onClick={() => { setShowConfig(v => !v); setShowUploader(false); }}
               className={cn(
                 'inline-flex items-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-semibold transition-colors',
                 showConfig
@@ -251,6 +265,18 @@ export function ShopeeIntelligencePanel({ shopId1, shopId2 }: ShopeeIntelligence
             </button>
           </div>
         </div>
+
+        {/* Painel de upload CSV */}
+        {showUploader && (
+          <div className="mt-3">
+            <CsvUploader
+              shopId1={shopId1}
+              shopId2={shopId2}
+              onSuccess={() => fetchData(shopFilter, period)}
+              onClose={() => setShowUploader(false)}
+            />
+          </div>
+        )}
 
         {/* Config de threshold */}
         {showConfig && (

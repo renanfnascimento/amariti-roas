@@ -1,0 +1,385 @@
+'use client';
+
+import { useState, useRef, useTransition, useCallback } from 'react';
+import Papa from 'papaparse';
+import { UploadCloud, FileText, CheckCircle2, AlertCircle, X, Loader2 } from 'lucide-react';
+import { cn } from '@/lib/utils';
+import { importShopeeCSV, type ImportResult } from '@/app/actions/importCsv';
+
+// ── Props ─────────────────────────────────────────────────────────────────────
+
+export interface CsvUploaderProps {
+  shopId1:   number;
+  shopId2:   number;
+  onSuccess: () => void;
+  onClose:   () => void;
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+function Badge({ text, color }: { text: string; color: 'green' | 'blue' | 'gray' }) {
+  return (
+    <span className={cn(
+      'inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold',
+      color === 'green' ? 'bg-emerald-100 text-emerald-700' :
+      color === 'blue'  ? 'bg-blue-100 text-blue-700'       :
+                          'bg-gray-100 text-gray-500',
+    )}>
+      {text}
+    </span>
+  );
+}
+
+// ── Componente ────────────────────────────────────────────────────────────────
+
+type State = 'idle' | 'parsing' | 'preview' | 'uploading' | 'done' | 'error';
+
+const FIELD_LABELS: Record<string, string> = {
+  sku:                 'SKU',
+  product_name:        'Nome',
+  organic_views:       'Views Org.',
+  organic_conversions: 'Pedidos Org.',
+  ads_spend:           'Gasto Ads',
+  ads_conversions:     'Conv. Ads',
+  roas_score:          'ROAS',
+  ads_revenue:         'Receita Ads',
+};
+
+export function CsvUploader({ shopId1, shopId2, onSuccess, onClose }: CsvUploaderProps) {
+  const [state,      setState]      = useState<State>('idle');
+  const [dragOver,   setDragOver]   = useState(false);
+  const [parsedRows, setParsedRows] = useState<Record<string, string>[]>([]);
+  const [headers,    setHeaders]    = useState<string[]>([]);
+  const [fileName,   setFileName]   = useState('');
+  const [shopId,     setShopId]     = useState<number>(shopId1 || shopId2 || 0);
+  const [result,     setResult]     = useState<ImportResult | null>(null);
+  const [, startT] = useTransition();
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  // ── Leitura e parse do CSV no browser ────────────────────────────────────
+  const handleFile = useCallback((file: File) => {
+    if (!file.name.match(/\.(csv|txt)$/i)) {
+      setState('error');
+      setResult({ imported: 0, skipped: 0, columns: [], error: 'Formato inválido. Use arquivo .csv ou .txt exportado pela Shopee.' });
+      return;
+    }
+
+    setState('parsing');
+    setFileName(file.name);
+
+    Papa.parse<Record<string, string>>(file, {
+      header:         true,
+      skipEmptyLines: true,
+      encoding:       'UTF-8',
+      complete(results) {
+        const rows = results.data;
+        if (!rows.length) {
+          setState('error');
+          setResult({ imported: 0, skipped: 0, columns: [], error: 'Arquivo sem dados válidos.' });
+          return;
+        }
+        setParsedRows(rows);
+        setHeaders(Object.keys(rows[0]));
+        setState('preview');
+      },
+      error(err) {
+        setState('error');
+        setResult({ imported: 0, skipped: 0, columns: [], error: `Erro ao ler arquivo: ${err.message}` });
+      },
+    });
+  }, []);
+
+  // ── Drag & Drop ───────────────────────────────────────────────────────────
+  function handleDragOver(e: React.DragEvent) {
+    e.preventDefault();
+    setDragOver(true);
+  }
+  function handleDragLeave() { setDragOver(false); }
+  function handleDrop(e: React.DragEvent) {
+    e.preventDefault();
+    setDragOver(false);
+    const file = e.dataTransfer.files[0];
+    if (file) handleFile(file);
+  }
+
+  // ── Envio para Server Action ───────────────────────────────────────────────
+  function handleUpload() {
+    if (!parsedRows.length || !shopId) return;
+    setState('uploading');
+    startT(async () => {
+      const res = await importShopeeCSV(parsedRows, shopId);
+      setResult(res);
+      setState(res.error ? 'error' : 'done');
+      if (!res.error) onSuccess();
+    });
+  }
+
+  function reset() {
+    setState('idle');
+    setDragOver(false);
+    setParsedRows([]);
+    setHeaders([]);
+    setFileName('');
+    setResult(null);
+    if (inputRef.current) inputRef.current.value = '';
+  }
+
+  const selectClass = 'rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700 shadow-sm focus:outline-none focus:ring-2 focus:ring-orange-300 cursor-pointer';
+
+  // ── Render ────────────────────────────────────────────────────────────────
+  return (
+    <div className="border border-gray-200 rounded-xl bg-white shadow-sm overflow-hidden">
+
+      {/* Header do painel de upload */}
+      <div className="flex items-center justify-between px-5 py-3.5 border-b border-gray-100 bg-gray-50">
+        <div className="flex items-center gap-2">
+          <UploadCloud className="h-4 w-4 text-orange-500" />
+          <span className="text-sm font-semibold text-gray-800">
+            Importar Relatório Shopee (CSV)
+          </span>
+        </div>
+        <button
+          onClick={onClose}
+          className="rounded-md p-1 text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"
+        >
+          <X className="h-4 w-4" />
+        </button>
+      </div>
+
+      <div className="p-5 space-y-4">
+
+        {/* Dropzone — visível nos estados idle/parsing */}
+        {(state === 'idle' || state === 'parsing') && (
+          <div
+            onDragOver={handleDragOver}
+            onDragLeave={handleDragLeave}
+            onDrop={handleDrop}
+            onClick={() => inputRef.current?.click()}
+            className={cn(
+              'flex flex-col items-center justify-center gap-3 rounded-xl border-2 border-dashed px-6 py-10 cursor-pointer transition-colors',
+              dragOver
+                ? 'border-orange-400 bg-orange-50'
+                : 'border-gray-200 hover:border-orange-300 hover:bg-orange-50/40',
+            )}
+          >
+            {state === 'parsing' ? (
+              <Loader2 className="h-8 w-8 text-orange-400 animate-spin" />
+            ) : (
+              <UploadCloud className={cn('h-8 w-8', dragOver ? 'text-orange-500' : 'text-gray-300')} />
+            )}
+            <div className="text-center">
+              <p className="text-sm font-semibold text-gray-700">
+                {state === 'parsing' ? 'Lendo arquivo…' : 'Arraste o arquivo CSV ou clique para selecionar'}
+              </p>
+              <p className="text-xs text-gray-400 mt-0.5">
+                Exportado em: Shopee → Business Insights → Relatório de Performance de Produtos
+              </p>
+            </div>
+            <input
+              ref={inputRef}
+              type="file"
+              accept=".csv,.txt"
+              className="hidden"
+              onChange={e => { const f = e.target.files?.[0]; if (f) handleFile(f); }}
+            />
+          </div>
+        )}
+
+        {/* Preview — após parse bem-sucedido */}
+        {state === 'preview' && (
+          <div className="space-y-4">
+
+            {/* Resumo do arquivo */}
+            <div className="flex items-start gap-3 rounded-xl bg-blue-50 border border-blue-200 px-4 py-3">
+              <FileText className="h-4 w-4 text-blue-500 flex-shrink-0 mt-0.5" />
+              <div className="flex-1 min-w-0">
+                <p className="text-xs font-semibold text-blue-800 truncate">{fileName}</p>
+                <p className="text-xs text-blue-600 mt-0.5">
+                  {parsedRows.length} linha{parsedRows.length !== 1 ? 's' : ''} detectada{parsedRows.length !== 1 ? 's' : ''}
+                </p>
+              </div>
+              <button onClick={reset} className="text-blue-400 hover:text-blue-600 flex-shrink-0">
+                <X className="h-3.5 w-3.5" />
+              </button>
+            </div>
+
+            {/* Colunas detectadas */}
+            <div>
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-400 mb-2">
+                Colunas do CSV ({headers.length} encontradas)
+              </p>
+              <div className="flex flex-wrap gap-1.5">
+                {headers.map(h => {
+                  const normalized = h.toLowerCase().trim()
+                    .normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/\s+/g, ' ');
+                  // Check if this header maps to a known field
+                  const knownFields: Record<string, string> = {
+                    'sku pai': 'sku', 'sku': 'sku', 'codigo sku': 'sku', 'parent sku': 'sku', 'item sku': 'sku',
+                    'nome do produto': 'product_name', 'nome': 'product_name', 'produto': 'product_name',
+                    'visualizacoes da pagina do produto': 'organic_views', 'visualizacoes': 'organic_views',
+                    'visitantes': 'organic_views', 'impressoes': 'organic_views',
+                    'pedidos': 'organic_conversions', 'total de pedidos': 'organic_conversions',
+                    'gastos': 'ads_spend', 'gastos com anuncios': 'ads_spend', 'custo de anuncio': 'ads_spend',
+                    'pedidos via anuncios': 'ads_conversions', 'pedidos de anuncios': 'ads_conversions',
+                    'roas': 'roas_score',
+                    'faturamento via anuncios': 'ads_revenue',
+                  };
+                  const mapped = knownFields[normalized];
+                  return (
+                    <span key={h} className={cn(
+                      'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium border',
+                      mapped
+                        ? 'bg-emerald-50 border-emerald-200 text-emerald-700'
+                        : 'bg-gray-50 border-gray-200 text-gray-400',
+                    )}>
+                      {mapped && <span className="font-bold">✓</span>}
+                      <span className="truncate max-w-[160px]" title={h}>{h}</span>
+                      {mapped && <span className="opacity-60">→ {FIELD_LABELS[mapped] ?? mapped}</span>}
+                    </span>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Amostra dos dados */}
+            {parsedRows.length > 0 && (
+              <div>
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-400 mb-2">
+                  Prévia (3 primeiras linhas)
+                </p>
+                <div className="overflow-x-auto rounded-lg border border-gray-200">
+                  <table className="text-[10px] w-full min-w-max">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        {headers.slice(0, 8).map(h => (
+                          <th key={h} className="px-2 py-1.5 text-left font-semibold text-gray-500 whitespace-nowrap max-w-[120px] truncate">
+                            {h}
+                          </th>
+                        ))}
+                        {headers.length > 8 && <th className="px-2 py-1.5 text-gray-400">+{headers.length - 8}</th>}
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                      {parsedRows.slice(0, 3).map((row, i) => (
+                        <tr key={i}>
+                          {headers.slice(0, 8).map(h => (
+                            <td key={h} className="px-2 py-1.5 text-gray-700 whitespace-nowrap max-w-[120px] truncate" title={row[h]}>
+                              {row[h] || '—'}
+                            </td>
+                          ))}
+                          {headers.length > 8 && <td className="px-2 py-1.5 text-gray-300">…</td>}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
+            {/* Seletor de loja + botão de confirmar */}
+            <div className="flex items-center gap-3 pt-1">
+              <div className="flex items-center gap-2">
+                <label className="text-xs font-semibold text-gray-600 whitespace-nowrap">Loja:</label>
+                <select
+                  value={shopId}
+                  onChange={e => setShopId(Number(e.target.value))}
+                  className={selectClass}
+                >
+                  {shopId1 > 0 && <option value={shopId1}>Shopee Renan (ID {shopId1})</option>}
+                  {shopId2 > 0 && <option value={shopId2}>Shopee Amariti (ID {shopId2})</option>}
+                  {shopId1 === 0 && shopId2 === 0 && (
+                    <option value={0} disabled>Configure SHOPEE_SHOP_ID_1 no env</option>
+                  )}
+                </select>
+              </div>
+
+              <div className="flex gap-2 ml-auto">
+                <button
+                  onClick={reset}
+                  className="px-3 py-2 text-xs font-semibold rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 transition-colors"
+                >
+                  Trocar arquivo
+                </button>
+                <button
+                  onClick={handleUpload}
+                  disabled={!shopId}
+                  className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-semibold rounded-lg bg-orange-500 text-white hover:bg-orange-600 disabled:opacity-50 transition-colors"
+                >
+                  <UploadCloud className="h-3.5 w-3.5" />
+                  Confirmar Importação ({parsedRows.length} linhas)
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Loading do upload */}
+        {state === 'uploading' && (
+          <div className="flex flex-col items-center gap-3 py-8">
+            <Loader2 className="h-8 w-8 text-orange-500 animate-spin" />
+            <p className="text-sm font-semibold text-gray-700">
+              Salvando {parsedRows.length} linhas no Supabase…
+            </p>
+            <p className="text-xs text-gray-400">Cruzando SKUs e atualizando métricas</p>
+          </div>
+        )}
+
+        {/* Resultado — sucesso */}
+        {state === 'done' && result && (
+          <div className="space-y-3">
+            <div className="flex items-start gap-3 rounded-xl bg-emerald-50 border border-emerald-200 px-4 py-4">
+              <CheckCircle2 className="h-5 w-5 text-emerald-600 flex-shrink-0 mt-0.5" />
+              <div>
+                <p className="text-sm font-bold text-emerald-800">Importação concluída!</p>
+                <p className="text-xs text-emerald-700 mt-0.5">
+                  <strong>{result.imported}</strong> produto{result.imported !== 1 ? 's' : ''} salvos/atualizados
+                  {result.skipped > 0 && ` · ${result.skipped} linha${result.skipped > 1 ? 's' : ''} ignorada${result.skipped > 1 ? 's' : ''} (sem SKU)`}
+                </p>
+                {result.columns.length > 0 && (
+                  <div className="flex flex-wrap gap-1 mt-2">
+                    {result.columns.map(c => (
+                      <Badge key={c} text={FIELD_LABELS[c] ?? c} color="green" />
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={reset}
+                className="px-3 py-2 text-xs font-semibold rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 transition-colors"
+              >
+                Importar outro arquivo
+              </button>
+              <button
+                onClick={onClose}
+                className="px-3 py-2 text-xs font-semibold rounded-lg bg-gray-900 text-white hover:bg-gray-700 transition-colors"
+              >
+                Fechar
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Resultado — erro */}
+        {state === 'error' && result?.error && (
+          <div className="space-y-3">
+            <div className="flex items-start gap-3 rounded-xl bg-red-50 border border-red-200 px-4 py-4">
+              <AlertCircle className="h-5 w-5 text-red-600 flex-shrink-0 mt-0.5" />
+              <div>
+                <p className="text-sm font-bold text-red-800">Erro na importação</p>
+                <p className="text-xs text-red-700 mt-0.5">{result.error}</p>
+              </div>
+            </div>
+            <button
+              onClick={reset}
+              className="px-3 py-2 text-xs font-semibold rounded-lg border border-red-200 text-red-600 hover:bg-red-50 transition-colors"
+            >
+              Tentar novamente
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
