@@ -5,6 +5,7 @@ import { usePathname } from 'next/navigation';
 import {
   LayoutDashboard,
   ShoppingBag,
+  Kanban,
   Globe,
   Music2,
   Plug,
@@ -13,8 +14,9 @@ import { cn } from '@/lib/utils';
 
 const navItems = [
   { href: '/', label: 'Visão Geral', icon: LayoutDashboard },
-  { href: '/shopee-ads', label: 'Shopee Ads', icon: ShoppingBag },
-  { href: '/meta-ads', label: 'Meta Ads', icon: Globe },
+  { href: '/shopee-ads',   label: 'Shopee Ads',   icon: ShoppingBag },
+  { href: '/crm-anuncios', label: 'CRM Anúncios', icon: Kanban },
+  { href: '/meta-ads',     label: 'Meta Ads',     icon: Globe },
   { href: '/tiktok-ads', label: 'TikTok Ads', icon: Music2 },
   { href: '/integracoes', label: 'Integrações', icon: Plug },
 ];

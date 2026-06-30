@@ -65,6 +65,28 @@ export interface Diagnosis {
   icon: string;
 }
 
+// ── CRM de Anúncios ───────────────────────────────────────────────────────────
+
+export type CrmStatus = 'incubacao' | 'otimizacao' | 'escala' | 'descarte';
+
+export interface CrmProduto {
+  product_id:           number;
+  shop_id:              number;
+  name:                 string;
+  price:                number;
+  status:               CrmStatus;
+  status_sugerido:      CrmStatus;
+  ciclo_inicio:         string | null;
+  ultima_alteracao_foto: string | null;
+  dias_no_ciclo:        number;
+  total_impressions:    number;
+  total_clicks:         number;
+  total_orders:         number;
+  total_visitors:       number;
+  ctr:                  number;
+  conv_rate:            number;
+}
+
 export function analyzeProduct(p: ShopeeProductData): Diagnosis[] {
   const result: Diagnosis[] = [];
 
