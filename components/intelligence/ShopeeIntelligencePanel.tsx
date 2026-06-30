@@ -22,6 +22,7 @@ interface PerformanceRow {
   ads_conversions:     number;
   roas_score:          number;
   ads_paused:          boolean;
+  shopee_diagnosis:    string | null;
   updated_at:          string;
 }
 
@@ -98,6 +99,40 @@ function StatCard({
   );
 }
 
+// ── Badge de Diagnóstico Shopee ───────────────────────────────────────────────
+
+const DIAGNOSIS_STYLES: Record<string, string> = {
+  'Otimize Seus ADS':               'bg-red-100 text-red-700 border-red-200',
+  'Impulsionar com ADS':            'bg-emerald-100 text-emerald-700 border-emerald-200',
+  'Acompanhar Performance dos ADS': 'bg-blue-100 text-blue-700 border-blue-200',
+  'Produtos com Melhor Desempenho': 'bg-purple-100 text-purple-700 border-purple-200',
+};
+
+// Rótulos curtos para caber na célula
+const DIAGNOSIS_SHORT: Record<string, string> = {
+  'Otimize Seus ADS':               'Otimizar ADS',
+  'Impulsionar com ADS':            'Impulsionar',
+  'Acompanhar Performance dos ADS': 'Monitorar',
+  'Produtos com Melhor Desempenho': 'Top Produto',
+};
+
+function DiagnosisBadge({ value }: { value: string | null }) {
+  if (!value) {
+    return <span className="text-[10px] text-gray-300">—</span>;
+  }
+  return (
+    <span
+      title={value}
+      className={cn(
+        'inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold border whitespace-nowrap',
+        DIAGNOSIS_STYLES[value] ?? 'bg-gray-100 text-gray-600 border-gray-200',
+      )}
+    >
+      {DIAGNOSIS_SHORT[value] ?? value}
+    </span>
+  );
+}
+
 function SkeletonRows() {
   return (
     <>
@@ -107,6 +142,7 @@ function SkeletonRows() {
             <div className="h-3 w-3/4 rounded bg-gray-200 mb-1.5" />
             <div className="h-2 w-1/3 rounded bg-gray-100" />
           </td>
+          <td className="px-4 py-3.5"><div className="h-4 w-20 rounded-full bg-gray-200" /></td>
           {Array.from({ length: 7 }).map((_, j) => (
             <td key={j} className="px-4 py-3.5 text-right">
               <div className="h-3 w-12 rounded bg-gray-200 ml-auto" />
@@ -142,7 +178,7 @@ export function ShopeeIntelligencePanel({ shopId1, shopId2 }: ShopeeIntelligence
       const supabase = getSupabase();
       let query = supabase
         .from('shopee_performance_data')
-        .select('id,shop_id,sku,product_name,organic_views,organic_conversions,ads_spend,ads_conversions,roas_score,ads_paused,updated_at')
+        .select('id,shop_id,sku,product_name,organic_views,organic_conversions,ads_spend,ads_conversions,roas_score,ads_paused,shopee_diagnosis,updated_at')
         .order('roas_score', { ascending: false })
         .range(0, 199);
 
@@ -401,6 +437,7 @@ export function ShopeeIntelligencePanel({ shopId1, shopId2 }: ShopeeIntelligence
               <thead className="bg-gray-50 border-b border-gray-200">
                 <tr>
                   <th className="px-4 py-3 text-left   text-[11px] font-semibold uppercase tracking-wide text-gray-400 min-w-[220px]">Produto / SKU</th>
+                  <th className="px-4 py-3 text-left   text-[11px] font-semibold uppercase tracking-wide text-gray-400 min-w-[160px]">Diag. Shopee</th>
                   <th className="px-4 py-3 text-right  text-[11px] font-semibold uppercase tracking-wide text-gray-400">Views Org.</th>
                   <th className="px-4 py-3 text-right  text-[11px] font-semibold uppercase tracking-wide text-gray-400">Conv. Org.</th>
                   <th className="px-4 py-3 text-right  text-[11px] font-semibold uppercase tracking-wide text-gray-400">Gasto Ads</th>
@@ -416,7 +453,7 @@ export function ShopeeIntelligencePanel({ shopId1, shopId2 }: ShopeeIntelligence
 
                 {!loading && filtered.length === 0 && (
                   <tr>
-                    <td colSpan={8} className="px-4 py-16 text-center">
+                    <td colSpan={9} className="px-4 py-16 text-center">
                       <div className="flex flex-col items-center gap-3">
                         <Zap className="h-8 w-8 text-gray-200" />
                         <p className="text-sm font-semibold text-gray-500">
@@ -452,6 +489,10 @@ export function ShopeeIntelligencePanel({ shopId1, shopId2 }: ShopeeIntelligence
                           {row.product_name || '(sem nome)'}
                         </p>
                         <p className="text-[10px] text-gray-400 mt-0.5 font-mono">{row.sku}</p>
+                      </td>
+
+                      <td className="px-4 py-3.5">
+                        <DiagnosisBadge value={row.shopee_diagnosis} />
                       </td>
 
                       <td className="px-4 py-3.5 text-right text-xs text-gray-700">

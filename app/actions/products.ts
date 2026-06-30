@@ -79,6 +79,26 @@ export async function getShopeeProducts(
       console.log(`[cross-tiny:${account}] Nenhum SKU vinculado em roas.shopee_products — preencha a coluna sku para ativar o cruzamento`);
     }
 
+    // ── Cruzamento com diagnóstico do relatório Shopee (roas.shopee_performance_data) ──
+    const diagMap = new Map<string, string>();
+    if (skus.length > 0) {
+      const { data: diagRows, error: diagErr } = await supabase
+        .from('shopee_performance_data')
+        .select('sku, shopee_diagnosis')
+        .in('sku', skus)
+        .not('shopee_diagnosis', 'is', null);
+
+      if (diagErr) {
+        console.error('[cross-diag] ERRO ao buscar diagnóstico:', diagErr.message);
+      } else {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (diagRows ?? []).forEach((r: any) => {
+          if (r.sku && r.shopee_diagnosis) diagMap.set(r.sku, r.shopee_diagnosis);
+        });
+        console.log(`[cross-diag:${account}] ${diagMap.size} SKUs com diagnóstico Shopee`);
+      }
+    }
+
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     return (data ?? []).map((row: any) => {
       const sku: string | null = row.shopee_products?.sku ?? null;
@@ -105,6 +125,9 @@ export async function getShopeeProducts(
         sku,
         estoque_tiny: sku !== null && estoqueMap.has(sku)
           ? estoqueMap.get(sku)!
+          : null,
+        shopee_diagnosis: sku !== null && diagMap.has(sku)
+          ? diagMap.get(sku)!
           : null,
       };
     });

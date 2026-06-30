@@ -20,7 +20,7 @@ const MOCK: ShopeeProductData[] = [
     impressions: 26,   clicks: 1,  orders: 1, units: 1,
     product_visitors: 1,  cart_visitors: 1,  revenue: 119.92,
     ctr: 3.85, order_conv_rate: 100.00, cart_conv_rate: 100.00,
-    sku: null, estoque_tiny: null,
+    sku: null, estoque_tiny: null, shopee_diagnosis: null,
   },
   {
     shopee_product_id: '18465873199',
@@ -29,7 +29,7 @@ const MOCK: ShopeeProductData[] = [
     impressions: 1358, clicks: 56, orders: 1, units: 3,
     product_visitors: 46, cart_visitors: 8,  revenue: 118.26,
     ctr: 4.12, order_conv_rate: 1.79, cart_conv_rate: 17.39,
-    sku: null, estoque_tiny: null,
+    sku: null, estoque_tiny: null, shopee_diagnosis: null,
   },
   {
     shopee_product_id: '23994919436',
@@ -38,7 +38,7 @@ const MOCK: ShopeeProductData[] = [
     impressions: 1326, clicks: 39, orders: 1, units: 1,
     product_visitors: 35, cart_visitors: 5,  revenue: 78.92,
     ctr: 2.94, order_conv_rate: 2.56, cart_conv_rate: 14.29,
-    sku: null, estoque_tiny: null,
+    sku: null, estoque_tiny: null, shopee_diagnosis: null,
   },
   {
     shopee_product_id: '19499092538',
@@ -47,7 +47,7 @@ const MOCK: ShopeeProductData[] = [
     impressions: 248,  clicks: 12, orders: 1, units: 1,
     product_visitors: 11, cart_visitors: 0,  revenue: 47.94,
     ctr: 4.84, order_conv_rate: 8.33, cart_conv_rate: 0.00,
-    sku: null, estoque_tiny: null,
+    sku: null, estoque_tiny: null, shopee_diagnosis: null,
   },
 ];
 
@@ -84,6 +84,36 @@ function priorityIcon(diagnoses: Diagnosis[]) {
 }
 
 // ── Sub-componentes ───────────────────────────────────────────────────────────
+
+// ── Badge de Diagnóstico Shopee ───────────────────────────────────────────────
+
+const SHOPEE_DIAG_STYLES: Record<string, string> = {
+  'Otimize Seus ADS':               'bg-red-100 text-red-700',
+  'Impulsionar com ADS':            'bg-emerald-100 text-emerald-700',
+  'Acompanhar Performance dos ADS': 'bg-blue-100 text-blue-700',
+  'Produtos com Melhor Desempenho': 'bg-purple-100 text-purple-700',
+};
+const SHOPEE_DIAG_SHORT: Record<string, string> = {
+  'Otimize Seus ADS':               'Otimizar ADS',
+  'Impulsionar com ADS':            'Impulsionar',
+  'Acompanhar Performance dos ADS': 'Monitorar',
+  'Produtos com Melhor Desempenho': 'Top Produto',
+};
+
+function ShopeeDiagBadge({ value }: { value: string | null }) {
+  if (!value) return <span className="text-[10px] text-gray-300">—</span>;
+  return (
+    <span
+      title={value}
+      className={cn(
+        'inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold whitespace-nowrap',
+        SHOPEE_DIAG_STYLES[value] ?? 'bg-gray-100 text-gray-600',
+      )}
+    >
+      {SHOPEE_DIAG_SHORT[value] ?? value}
+    </span>
+  );
+}
 
 function MetricBadge({ value, className }: { value: string; className: string }) {
   return (
@@ -416,6 +446,7 @@ export function ShopeeProductsPanel({ products, initialAccount = 'shopee-renan' 
                   <ThSortable col="units"            label="Unidades"    right sortBy={sortBy} sortAsc={sortAsc} onSort={toggleSort} />
                   <ThSortable col="order_conv_rate"  label="Conv.Ped."   right sortBy={sortBy} sortAsc={sortAsc} onSort={toggleSort} />
                   <th className="px-3 py-3 text-right text-[11px] font-semibold uppercase tracking-wide text-gray-400 whitespace-nowrap">Estoque (Tiny)</th>
+                  <th className="px-3 py-3 text-left text-[11px] font-semibold uppercase tracking-wide text-gray-400 whitespace-nowrap">Diag. Shopee</th>
                   <th className="px-3 py-3 text-left text-[11px] font-semibold uppercase tracking-wide text-gray-400 min-w-[180px]">Diagnóstico</th>
                   <th className="px-3 py-3 text-center text-[11px] font-semibold uppercase tracking-wide text-gray-400">Ação</th>
                 </tr>
@@ -482,6 +513,10 @@ export function ShopeeProductsPanel({ products, initialAccount = 'shopee-renan' 
                       )}
                     </td>
 
+                    <td className="px-3 py-3">
+                      <ShopeeDiagBadge value={p.shopee_diagnosis} />
+                    </td>
+
                     <td className="px-3 py-3"><DiagnosisTags diagnoses={p.diagnoses} /></td>
 
                     <td className="px-3 py-3 text-center">
@@ -501,7 +536,7 @@ export function ShopeeProductsPanel({ products, initialAccount = 'shopee-renan' 
                 {/* Empty state */}
                 {!isSyncing && paginated.length === 0 && (
                   <tr>
-                    <td colSpan={14} className="px-4 py-12 text-center text-sm text-gray-400">
+                    <td colSpan={15} className="px-4 py-12 text-center text-sm text-gray-400">
                       {isDemo
                         ? 'Nenhum dado. Clique em Sincronizar para buscar da Shopee.'
                         : 'Nenhum produto com os filtros aplicados.'}
