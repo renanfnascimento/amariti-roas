@@ -1,7 +1,7 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
-import { getSupabase } from '@/lib/supabase';
+import { getSupabase, getSupabasePublic } from '@/lib/supabase';
 import { getShopeeItemPerformance } from '@/lib/shopee';
 import { ShopeeProductData } from '@/types';
 
@@ -54,19 +54,29 @@ export async function getShopeeProducts(
         .filter((s): s is string => typeof s === 'string' && s.length > 0),
     )];
 
+    console.log(`[cross-tiny:${account}] shopee_products retornou ${(data ?? []).length} métricas`);
+    console.log(`[cross-tiny:${account}] SKUs vinculados (roas.shopee_products.sku): ${skus.length}`, skus.slice(0, 5));
+
     const estoqueMap = new Map<string, number>();
     if (skus.length > 0) {
-      // .schema('public') sobrescreve o schema padrão 'roas' para esta query
-      const { data: estoqueRows } = await (supabase as any)
-        .schema('public')
+      // Usa cliente 'public' dedicado — evita conflito com schema padrão 'roas'
+      const supabasePublic = getSupabasePublic();
+      const { data: estoqueRows, error: estoqueErr } = await supabasePublic
         .from('produtos')
         .select('sku, stock')
         .in('sku', skus);
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (estoqueRows ?? []).forEach((r: any) => {
-        if (r.sku) estoqueMap.set(r.sku, r.stock ?? 0);
-      });
+      if (estoqueErr) {
+        console.error('[cross-tiny] ERRO ao buscar public.produtos:', estoqueErr.message);
+      } else {
+        console.log(`[cross-tiny:${account}] Encontrados ${estoqueRows?.length ?? 0} registros em public.produtos`);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (estoqueRows ?? []).forEach((r: any) => {
+          if (r.sku) estoqueMap.set(r.sku, r.stock ?? 0);
+        });
+      }
+    } else {
+      console.log(`[cross-tiny:${account}] Nenhum SKU vinculado em roas.shopee_products — preencha a coluna sku para ativar o cruzamento`);
     }
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any

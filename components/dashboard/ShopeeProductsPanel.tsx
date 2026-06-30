@@ -465,17 +465,19 @@ export function ShopeeProductsPanel({ products, initialAccount = 'shopee-renan' 
 
                     <td className="px-3 py-3 text-right">
                       {p.estoque_tiny === null ? (
-                        <span className="text-[10px] text-gray-300 font-medium">—</span>
+                        <span className="inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-semibold text-gray-500 whitespace-nowrap">
+                          Não Vinculado
+                        </span>
                       ) : p.estoque_tiny === 0 ? (
                         <span className="inline-flex items-center rounded-full bg-red-100 px-2 py-0.5 text-xs font-bold text-red-700">
-                          0
+                          0 · Sem Estoque
                         </span>
                       ) : (
                         <span className={cn(
                           'inline-flex items-center rounded-full px-2 py-0.5 text-xs font-bold',
                           p.estoque_tiny <= 5 ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700',
                         )}>
-                          {p.estoque_tiny}
+                          {p.estoque_tiny} un.
                         </span>
                       )}
                     </td>
