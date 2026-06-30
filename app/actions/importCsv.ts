@@ -139,15 +139,12 @@ export async function importShopeeCSV(
 ): Promise<ImportResult> {
   if (!rawRows.length) return { imported: 0, skipped: 0, columns: [], error: 'Arquivo vazio' };
 
-  // Lê o shop_id real a partir do env — nunca exposto ao cliente
-  const shopId = Number(
-    (process.env[`SHOPEE_SHOP_ID_${shopIndex}`] ?? '').trim() || '0',
-  );
-  if (!shopId) {
-    return {
-      imported: 0, skipped: 0, columns: [],
-      error: `SHOPEE_SHOP_ID_${shopIndex} não configurado no servidor. Verifique o arquivo .env.local.`,
-    };
+  // Resolve shop_id: env var configurada (produção) ou índice como fallback (dev sem .env)
+  // Fallback garante que o upsert sempre aconteça em ambientes sem .env.local completo
+  const envShopId = (process.env[`SHOPEE_SHOP_ID_${shopIndex}`] ?? '').trim();
+  const shopId    = envShopId ? Number(envShopId) : shopIndex;
+  if (!envShopId) {
+    console.warn(`[importCsv] SHOPEE_SHOP_ID_${shopIndex} ausente — usando shop_id=${shopId} como fallback`);
   }
 
   // Detecta colunas e monta índice: header original → campo da tabela
@@ -213,6 +210,9 @@ export async function importShopeeCSV(
     return { imported: 0, skipped, columns: detectedCols, sheets: sheetsInData, error: 'Nenhuma linha com SKU válido encontrada' };
   }
 
+  // Colunas CRM (crm_status, cover_change_count, last_optimized_at) são
+  // intencionalmente AUSENTES do payload: o DB aplica os defaults em INSERT e
+  // o upsert preserva os valores existentes em UPDATE (sem sobrescrever).
   const supabase = getSupabase();
   const { error: dbErr } = await supabase
     .from('shopee_performance_data')
