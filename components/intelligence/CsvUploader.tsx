@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useTransition, useCallback } from 'react';
+import { useState, useRef, useCallback } from 'react';
 import { read, utils } from 'xlsx';
 import { UploadCloud, FileText, CheckCircle2, AlertCircle, X, Loader2, Layers } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -35,6 +35,9 @@ const TARGET_SHEETS = [
 ] as const;
 
 const ACCEPT = '.xlsx,.xls,.csv';
+
+// Máximo de linhas por chamada à Server Action — evita limite de payload do Next.js
+const CHUNK_SIZE = 50;
 
 // ── Mapeamento para preview de colunas (espelho do COLUMN_MAP no server action) ─
 
@@ -96,7 +99,7 @@ export function CsvUploader({ onSuccess, onClose }: CsvUploaderProps) {
   // Índice da loja (1 ou 2) — o server action resolve o shop_id real via env
   const [shopIndex,     setShopIndex]     = useState<1 | 2>(1);
   const [result,        setResult]        = useState<ImportResult | null>(null);
-  const [, startT] = useTransition();
+  const [progress,      setProgress]      = useState<{ done: number; total: number } | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   // ── Parse com SheetJS — suporta .xlsx/.xls/.csv ──────────────────────────
@@ -194,22 +197,52 @@ export function CsvUploader({ onSuccess, onClose }: CsvUploaderProps) {
     if (file) handleFile(file);
   }
 
-  // ── Envio para Server Action ───────────────────────────────────────────────
-  function handleUpload() {
+  // ── Envio em lotes para Server Action ────────────────────────────────────
+  async function handleUpload() {
     if (!parsedRows.length) return;
     setState('uploading');
-    startT(async () => {
-      const res = await importShopeeCSV(parsedRows, shopIndex);
-      setResult(res);
-      setState(res.error ? 'error' : 'done');
-      if (!res.error) onSuccess();
-    });
+
+    // Divide em chunks para evitar o limite de payload do Next.js
+    const chunks: Record<string, string>[][] = [];
+    for (let i = 0; i < parsedRows.length; i += CHUNK_SIZE) {
+      chunks.push(parsedRows.slice(i, i + CHUNK_SIZE));
+    }
+    setProgress({ done: 0, total: chunks.length });
+
+    let totalImported = 0;
+    let totalSkipped  = 0;
+    let detectedCols: string[]  = [];
+    let detectedSheets: string[] = [];
+    let errorMsg: string | undefined;
+
+    for (let i = 0; i < chunks.length; i++) {
+      const res = await importShopeeCSV(chunks[i], shopIndex);
+      totalImported += res.imported;
+      totalSkipped  += res.skipped;
+      if (res.columns.length > detectedCols.length) detectedCols = res.columns;
+      if (res.sheets) detectedSheets = [...new Set([...detectedSheets, ...res.sheets])];
+      if (res.error) { errorMsg = res.error; break; }
+      setProgress({ done: i + 1, total: chunks.length });
+    }
+
+    const finalResult: ImportResult = {
+      imported: totalImported,
+      skipped:  totalSkipped,
+      columns:  detectedCols,
+      sheets:   detectedSheets.length > 0 ? detectedSheets : undefined,
+      error:    errorMsg,
+    };
+
+    setResult(finalResult);
+    setProgress(null);
+    setState(errorMsg ? 'error' : 'done');
+    if (!errorMsg) onSuccess();
   }
 
   function reset() {
     setState('idle'); setDragOver(false);
     setParsedRows([]); setHeaders([]); setSheetsSummary([]);
-    setFileName(''); setResult(null);
+    setFileName(''); setResult(null); setProgress(null);
     if (inputRef.current) inputRef.current.value = '';
   }
 
@@ -384,12 +417,29 @@ export function CsvUploader({ onSuccess, onClose }: CsvUploaderProps) {
           </div>
         )}
 
-        {/* Loading */}
+        {/* Loading com progresso de lotes */}
         {state === 'uploading' && (
-          <div className="flex flex-col items-center gap-3 py-8">
+          <div className="flex flex-col items-center gap-4 py-8">
             <Loader2 className="h-8 w-8 text-orange-500 animate-spin" />
-            <p className="text-sm font-semibold text-gray-700">Salvando {parsedRows.length} linhas no Supabase…</p>
-            <p className="text-xs text-gray-400">Cruzando SKUs e atualizando diagnósticos</p>
+            {progress ? (
+              <div className="w-full max-w-xs space-y-2">
+                <div className="flex justify-between text-xs text-gray-500">
+                  <span>Lote {Math.min(progress.done + 1, progress.total)} de {progress.total}</span>
+                  <span>{Math.round((progress.done / progress.total) * 100)}%</span>
+                </div>
+                <div className="w-full h-2 rounded-full bg-gray-100 overflow-hidden">
+                  <div
+                    className="h-full bg-orange-500 rounded-full transition-all duration-300"
+                    style={{ width: `${Math.round((progress.done / progress.total) * 100)}%` }}
+                  />
+                </div>
+                <p className="text-xs text-center text-gray-400">
+                  {progress.done * CHUNK_SIZE} / {parsedRows.length} linhas enviadas
+                </p>
+              </div>
+            ) : (
+              <p className="text-sm font-semibold text-gray-700">Preparando lotes de importação…</p>
+            )}
           </div>
         )}
 
