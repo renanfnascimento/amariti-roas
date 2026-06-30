@@ -37,7 +37,8 @@ export async function getShopeeProducts(
     if (dateFrom)   query = query.gte('date', dateFrom);
     if (dateTo)     query = query.lte('date', dateTo);
 
-    const { data, error } = await query;
+    // Paginação: máximo 100 linhas por requisição (Shopee retorna até 100 items)
+    const { data, error } = await query.range(0, 99);
 
     if (error) {
       console.error('ERRO REAL SSR:', error);
@@ -80,21 +81,36 @@ export async function syncShopeeProductsData(
   shopIndex: 1 | 2 = 1,
   dateFrom?: string,
   dateTo?: string,
-): Promise<{ synced: number; error?: string }> {
+): Promise<{ synced: number; error?: string; timing?: Record<string, number> }> {
   const today   = new Date().toISOString().split('T')[0];
   const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
   const from    = dateFrom ?? weekAgo;
   const to      = dateTo   ?? today;
 
   const shopId = Number((process.env[`SHOPEE_SHOP_ID_${shopIndex}`] ?? '').trim() || '0');
+  const timing: Record<string, number> = {};
 
   try {
+    // ── Chamada à Shopee API ──────────────────────────────────────────────────
+    const t0 = Date.now();
+    console.time(`[sync:${account}] shopee-api`);
+
     const items = await getShopeeItemPerformance(from, to, shopIndex);
-    if (!items.length) return { synced: 0 };
+
+    const apiMs = Date.now() - t0;
+    console.timeEnd(`[sync:${account}] shopee-api`);
+    console.log(`[sync:${account}] shopee-api retornou ${items.length} itens em ${apiMs}ms`);
+    timing.shopeeApiMs = apiMs;
+
+    if (!items.length) return { synced: 0, timing };
 
     const supabase = getSupabase();
 
-    // Upsert produtos — chave composta (product_id, shop_id)
+    // ── Upsert no Supabase ────────────────────────────────────────────────────
+    const t1 = Date.now();
+    console.time(`[sync:${account}] supabase-upsert`);
+
+    // Produtos — chave composta (product_id, shop_id)
     const { error: prodErr } = await supabase
       .from('shopee_products')
       .upsert(
@@ -109,7 +125,7 @@ export async function syncShopeeProductsData(
 
     if (prodErr) throw new Error(prodErr.message);
 
-    // Upsert métricas — chave composta (product_id, shop_id, date)
+    // Métricas — chave composta (product_id, shop_id, date)
     const { error: metErr } = await supabase
       .from('shopee_product_metrics')
       .upsert(
@@ -127,12 +143,19 @@ export async function syncShopeeProductsData(
 
     if (metErr) throw new Error(metErr.message);
 
+    const dbMs = Date.now() - t1;
+    console.timeEnd(`[sync:${account}] supabase-upsert`);
+    console.log(`[sync:${account}] supabase-upsert concluído em ${dbMs}ms`);
+    timing.supabaseMs = dbMs;
+
+    console.log(`[sync:${account}] TOTAL ${timing.shopeeApiMs + timing.supabaseMs}ms | API ${timing.shopeeApiMs}ms | DB ${timing.supabaseMs}ms`);
+
     revalidatePath('/shopee-ads');
-    return { synced: items.length };
+    return { synced: items.length, timing };
 
   } catch (err) {
     const msg = err instanceof Error ? err.message : 'Erro desconhecido';
-    console.error('[syncShopeeProductsData]', msg);
-    return { synced: 0, error: msg };
+    console.error(`[sync:${account}]`, msg);
+    return { synced: 0, error: msg, timing };
   }
 }

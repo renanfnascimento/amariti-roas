@@ -1,10 +1,14 @@
 'use client';
 
 import { useState, useMemo, useTransition } from 'react';
-import { ExternalLink, AlertTriangle, Info, Search, RefreshCw } from 'lucide-react';
+import { ExternalLink, AlertTriangle, Info, Search, RefreshCw, ChevronLeft, ChevronRight } from 'lucide-react';
 import { syncShopeeProductsData } from '@/app/actions/products';
 import { cn } from '@/lib/utils';
 import { ShopeeProductData, Diagnosis, analyzeProduct } from '@/types';
+
+// ── Paginação ─────────────────────────────────────────────────────────────────
+
+const PAGE_SIZE = 25;
 
 // ── Fallback mock (dados reais do Gestor) ─────────────────────────────────────
 
@@ -45,13 +49,8 @@ const MOCK: ShopeeProductData[] = [
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-function fmtNum(v: number) {
-  return v.toLocaleString('pt-BR');
-}
-
-function fmtPct(v: number) {
-  return v.toFixed(2) + '%';
-}
+function fmtNum(v: number) { return v.toLocaleString('pt-BR'); }
+function fmtPct(v: number) { return v.toFixed(2) + '%'; }
 
 function ctrClass(ctr: number, impressions: number) {
   if (impressions < 100) return 'bg-gray-100 text-gray-500';
@@ -61,10 +60,10 @@ function ctrClass(ctr: number, impressions: number) {
 }
 
 function convClass(conv: number, clicks: number) {
-  if (clicks < 20)  return 'bg-gray-100 text-gray-500';
-  if (conv >= 3)    return 'bg-emerald-100 text-emerald-700';
-  if (conv >= 1)    return 'bg-yellow-100 text-yellow-700';
-  return                   'bg-red-100 text-red-700';
+  if (clicks < 20) return 'bg-gray-100 text-gray-500';
+  if (conv >= 3)   return 'bg-emerald-100 text-emerald-700';
+  if (conv >= 1)   return 'bg-yellow-100 text-yellow-700';
+  return                  'bg-red-100 text-red-700';
 }
 
 function cartConvClass(conv: number, visitors: number) {
@@ -102,7 +101,7 @@ function DiagnosisTags({ diagnoses }: { diagnoses: Diagnosis[] }) {
             'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold cursor-help',
             d.type === 'critical' ? 'bg-red-100 text-red-700' :
             d.type === 'warning'  ? 'bg-amber-100 text-amber-700' :
-                                    'bg-gray-100 text-gray-500'
+                                    'bg-gray-100 text-gray-500',
           )}
         >
           <span>{d.icon}</span>
@@ -113,7 +112,6 @@ function DiagnosisTags({ diagnoses }: { diagnoses: Diagnosis[] }) {
   );
 }
 
-// Componente de cabeçalho de coluna ordenável — deve ficar FORA do render
 interface ThSortableProps {
   col: keyof ShopeeProductData;
   label: string;
@@ -146,6 +144,28 @@ function SummaryCard({ label, value, sub }: { label: string; value: string; sub?
   );
 }
 
+// Skeleton para 7 linhas durante o sincronismo
+function SkeletonRows() {
+  return (
+    <>
+      {Array.from({ length: 7 }).map((_, i) => (
+        <tr key={i} className="animate-pulse border-b border-gray-100">
+          <td className="px-3 py-3"><div className="h-3 w-4 rounded bg-gray-200 mx-auto" /></td>
+          <td className="px-3 py-3">
+            <div className="h-3 rounded bg-gray-200 w-3/4 mb-1.5" />
+            <div className="h-2 rounded bg-gray-100 w-1/2" />
+          </td>
+          {Array.from({ length: 11 }).map((_, j) => (
+            <td key={j} className="px-3 py-3 text-right">
+              <div className="h-3 rounded bg-gray-200 w-10 ml-auto" />
+            </td>
+          ))}
+        </tr>
+      ))}
+    </>
+  );
+}
+
 // ── Panel Principal ───────────────────────────────────────────────────────────
 
 interface ShopeeProductsPanelProps {
@@ -154,36 +174,36 @@ interface ShopeeProductsPanelProps {
 }
 
 export function ShopeeProductsPanel({ products, initialAccount = 'shopee-renan' }: ShopeeProductsPanelProps) {
-  const [search, setSearch] = useState('');
+  const [search,      setSearch]      = useState('');
   const [filterAlert, setFilterAlert] = useState<'all' | 'critical' | 'warning'>('all');
-  const [dateFrom, setDateFrom] = useState('2026-06-01');
-  const [dateTo, setDateTo]     = useState('2026-06-21');
-  const [account, setAccount]   = useState(initialAccount);
-  const [sortBy, setSortBy]     = useState<keyof ShopeeProductData>('impressions');
-  const [sortAsc, setSortAsc]   = useState(false);
-  const [syncMsg, setSyncMsg]   = useState<{ ok: boolean; text: string } | null>(null);
-  const [isSyncing, startSync]  = useTransition();
+  const [dateFrom,    setDateFrom]    = useState('2026-06-01');
+  const [dateTo,      setDateTo]      = useState('2026-06-21');
+  const [account,     setAccount]     = useState(initialAccount);
+  const [sortBy,      setSortBy]      = useState<keyof ShopeeProductData>('impressions');
+  const [sortAsc,     setSortAsc]     = useState(false);
+  const [page,        setPage]        = useState(0);
+  const [syncMsg,     setSyncMsg]     = useState<{ ok: boolean; text: string } | null>(null);
+  const [isSyncing,   startSync]      = useTransition();
 
   function handleSync() {
     setSyncMsg(null);
     const shopIndex: 1 | 2 = account === 'shopee-amariti' ? 2 : 1;
     startSync(async () => {
       const result = await syncShopeeProductsData(account, shopIndex, dateFrom, dateTo);
-      setSyncMsg(
-        result.error
-          ? { ok: false, text: `Erro: ${result.error}` }
-          : { ok: true,  text: `${result.synced} produto${result.synced !== 1 ? 's' : ''} sincronizado${result.synced !== 1 ? 's' : ''}` },
-      );
+      if (result.error) {
+        setSyncMsg({ ok: false, text: `Erro: ${result.error}` });
+      } else {
+        const t = result.timing;
+        const detail = t ? ` (API ${t.shopeeApiMs}ms · DB ${t.supabaseMs}ms)` : '';
+        setSyncMsg({ ok: true, text: `${result.synced} produto${result.synced !== 1 ? 's' : ''} sincronizado${result.synced !== 1 ? 's' : ''}${detail} · Recarregue para ver` });
+      }
     });
   }
 
-  // Usa dados reais do BD; MOCK só quando não há nenhum produto (modo demo local)
   const isDemo = products.length === 0;
   const rows   = isDemo ? MOCK : products;
 
-  const enriched = useMemo(() => {
-    return rows.map((p) => ({ ...p, diagnoses: analyzeProduct(p) }));
-  }, [rows]);
+  const enriched = useMemo(() => rows.map((p) => ({ ...p, diagnoses: analyzeProduct(p) })), [rows]);
 
   const filtered = useMemo(() => {
     return enriched
@@ -201,7 +221,13 @@ export function ShopeeProductsPanel({ products, initialAccount = 'shopee-renan' 
       });
   }, [enriched, search, filterAlert, sortBy, sortAsc]);
 
-  // ── Agregados
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const safePage   = Math.min(page, totalPages - 1);
+  const paginated  = useMemo(
+    () => filtered.slice(safePage * PAGE_SIZE, (safePage + 1) * PAGE_SIZE),
+    [filtered, safePage],
+  );
+
   const totals = useMemo(() => {
     const s = enriched.reduce(
       (acc, p) => ({
@@ -227,9 +253,13 @@ export function ShopeeProductsPanel({ products, initialAccount = 'shopee-renan' 
   function toggleSort(col: keyof ShopeeProductData) {
     if (sortBy === col) setSortAsc((v) => !v);
     else { setSortBy(col); setSortAsc(false); }
+    setPage(0);
   }
 
   const selectClass = 'rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700 shadow-sm focus:outline-none focus:ring-2 focus:ring-orange-300 cursor-pointer';
+
+  const firstItem = filtered.length > 0 ? safePage * PAGE_SIZE + 1 : 0;
+  const lastItem  = Math.min((safePage + 1) * PAGE_SIZE, filtered.length);
 
   return (
     <div className="flex flex-col h-full bg-gray-50">
@@ -240,7 +270,9 @@ export function ShopeeProductsPanel({ products, initialAccount = 'shopee-renan' 
           <div>
             <h1 className="text-xl font-bold text-gray-900">Inteligência de Produtos — Shopee</h1>
             <p className="text-xs text-gray-400 mt-0.5">
-              Orgânico + Pago · Conta: <span className="font-semibold text-gray-600">Shopee Renan</span>
+              Orgânico + Pago · Conta: <span className="font-semibold text-gray-600">
+                {account === 'shopee-amariti' ? 'Shopee Amariti' : 'Shopee Renan'}
+              </span>
             </p>
           </div>
           <div className="flex items-center gap-2">
@@ -259,7 +291,7 @@ export function ShopeeProductsPanel({ products, initialAccount = 'shopee-renan' 
 
             {syncMsg && (
               <span className={cn(
-                'text-xs font-medium px-2 py-1 rounded-md',
+                'text-xs font-medium px-2 py-1 rounded-md max-w-xs truncate',
                 syncMsg.ok ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700',
               )}>
                 {syncMsg.text}
@@ -272,7 +304,7 @@ export function ShopeeProductsPanel({ products, initialAccount = 'shopee-renan' 
               className="inline-flex items-center gap-1.5 rounded-lg bg-orange-500 px-3 py-2 text-xs font-semibold text-white hover:bg-orange-600 disabled:opacity-60 transition-colors"
             >
               <RefreshCw className={cn('h-3.5 w-3.5', isSyncing && 'animate-spin')} />
-              {isSyncing ? 'Sincronizando...' : 'Sincronizar Dados'}
+              {isSyncing ? 'Consultando Shopee API...' : 'Sincronizar Dados'}
             </button>
           </div>
         </div>
@@ -282,17 +314,33 @@ export function ShopeeProductsPanel({ products, initialAccount = 'shopee-renan' 
       <div className="px-8 py-4 flex flex-wrap items-center gap-3 border-b border-gray-200 bg-white shadow-sm">
         <div className="flex items-center gap-2">
           <label className="text-xs font-medium text-gray-500">De</label>
-          <input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className={selectClass} />
+          <input
+            type="date" value={dateFrom}
+            onChange={(e) => { setDateFrom(e.target.value); setPage(0); }}
+            className={selectClass}
+          />
           <label className="text-xs font-medium text-gray-500">até</label>
-          <input type="date" value={dateTo}   onChange={(e) => setDateTo(e.target.value)}   className={selectClass} />
+          <input
+            type="date" value={dateTo}
+            onChange={(e) => { setDateTo(e.target.value); setPage(0); }}
+            className={selectClass}
+          />
         </div>
 
-        <select value={account} onChange={(e) => setAccount(e.target.value)} className={selectClass}>
+        <select
+          value={account}
+          onChange={(e) => { setAccount(e.target.value); setPage(0); }}
+          className={selectClass}
+        >
           <option value="shopee-renan">Shopee Renan</option>
           <option value="shopee-amariti">Shopee Amariti</option>
         </select>
 
-        <select value={filterAlert} onChange={(e) => setFilterAlert(e.target.value as typeof filterAlert)} className={selectClass}>
+        <select
+          value={filterAlert}
+          onChange={(e) => { setFilterAlert(e.target.value as typeof filterAlert); setPage(0); }}
+          className={selectClass}
+        >
           <option value="all">Todos os alertas</option>
           <option value="critical">🔴 Apenas críticos</option>
           <option value="warning">🟡 Com atenção</option>
@@ -304,15 +352,15 @@ export function ShopeeProductsPanel({ products, initialAccount = 'shopee-renan' 
             type="text"
             placeholder="Buscar produto ou ID..."
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={(e) => { setSearch(e.target.value); setPage(0); }}
             className={cn(selectClass, 'w-full pl-8')}
           />
         </div>
 
         <span className="ml-auto text-[11px] text-gray-400 font-medium">
           {isDemo
-            ? `${filtered.length} de ${enriched.length} produtos (demo)`
-            : `${filtered.length} de ${enriched.length} produtos (BD)`}
+            ? `${filtered.length} produtos (demo)`
+            : `${firstItem}–${lastItem} de ${filtered.length} produtos (BD)`}
         </span>
       </div>
 
@@ -328,7 +376,7 @@ export function ShopeeProductsPanel({ products, initialAccount = 'shopee-renan' 
           <SummaryCard label="Faturamento" value={totals.revenue.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })} sub="período" />
         </div>
 
-        {/* Legenda de diagnóstico */}
+        {/* Legenda */}
         <div className="flex flex-wrap gap-4 text-xs text-gray-500 items-center">
           <span className="font-semibold text-gray-600">Guia de diagnóstico:</span>
           <span className="flex items-center gap-1.5"><span className="text-base">📸</span> CTR baixo → trocar foto de capa / título</span>
@@ -339,35 +387,47 @@ export function ShopeeProductsPanel({ products, initialAccount = 'shopee-renan' 
 
         {/* Tabela de Produtos */}
         <div className="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
+
+          {/* Banner de loading durante sync */}
+          {isSyncing && (
+            <div className="flex items-center gap-2 px-4 py-2.5 bg-orange-50 border-b border-orange-100 text-xs font-medium text-orange-700">
+              <RefreshCw className="h-3.5 w-3.5 animate-spin flex-shrink-0" />
+              Consultando a Shopee API — isso pode levar alguns segundos…
+            </div>
+          )}
+
           <div className="overflow-x-auto">
             <table className="w-full text-sm min-w-[1100px]">
               <thead className="bg-gray-50 border-b border-gray-200">
                 <tr>
                   <th className="px-3 py-3 text-left text-[11px] font-semibold uppercase tracking-wide text-gray-400 w-8">#</th>
                   <th className="px-3 py-3 text-left text-[11px] font-semibold uppercase tracking-wide text-gray-400 min-w-[240px]">Produto</th>
-                  <ThSortable col="impressions"      label="Impressões"    right sortBy={sortBy} sortAsc={sortAsc} onSort={toggleSort} />
-                  <ThSortable col="clicks"           label="Cliques"       right sortBy={sortBy} sortAsc={sortAsc} onSort={toggleSort} />
-                  <ThSortable col="ctr"              label="CTR"           right sortBy={sortBy} sortAsc={sortAsc} onSort={toggleSort} />
-                  <ThSortable col="product_visitors" label="Visitantes"    right sortBy={sortBy} sortAsc={sortAsc} onSort={toggleSort} />
-                  <ThSortable col="cart_visitors"    label="Carrinho"      right sortBy={sortBy} sortAsc={sortAsc} onSort={toggleSort} />
-                  <ThSortable col="cart_conv_rate"   label="Conv.Cart"     right sortBy={sortBy} sortAsc={sortAsc} onSort={toggleSort} />
-                  <ThSortable col="orders"           label="Pedidos"       right sortBy={sortBy} sortAsc={sortAsc} onSort={toggleSort} />
-                  <ThSortable col="units"            label="Unidades"      right sortBy={sortBy} sortAsc={sortAsc} onSort={toggleSort} />
-                  <ThSortable col="order_conv_rate"  label="Conv.Ped."     right sortBy={sortBy} sortAsc={sortAsc} onSort={toggleSort} />
+                  <ThSortable col="impressions"      label="Impressões"  right sortBy={sortBy} sortAsc={sortAsc} onSort={toggleSort} />
+                  <ThSortable col="clicks"           label="Cliques"     right sortBy={sortBy} sortAsc={sortAsc} onSort={toggleSort} />
+                  <ThSortable col="ctr"              label="CTR"         right sortBy={sortBy} sortAsc={sortAsc} onSort={toggleSort} />
+                  <ThSortable col="product_visitors" label="Visitantes"  right sortBy={sortBy} sortAsc={sortAsc} onSort={toggleSort} />
+                  <ThSortable col="cart_visitors"    label="Carrinho"    right sortBy={sortBy} sortAsc={sortAsc} onSort={toggleSort} />
+                  <ThSortable col="cart_conv_rate"   label="Conv.Cart"   right sortBy={sortBy} sortAsc={sortAsc} onSort={toggleSort} />
+                  <ThSortable col="orders"           label="Pedidos"     right sortBy={sortBy} sortAsc={sortAsc} onSort={toggleSort} />
+                  <ThSortable col="units"            label="Unidades"    right sortBy={sortBy} sortAsc={sortAsc} onSort={toggleSort} />
+                  <ThSortable col="order_conv_rate"  label="Conv.Ped."   right sortBy={sortBy} sortAsc={sortAsc} onSort={toggleSort} />
                   <th className="px-3 py-3 text-left text-[11px] font-semibold uppercase tracking-wide text-gray-400 min-w-[180px]">Diagnóstico</th>
                   <th className="px-3 py-3 text-center text-[11px] font-semibold uppercase tracking-wide text-gray-400">Ação</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
-                {filtered.map((p) => (
+
+                {/* Skeleton durante sincronismo */}
+                {isSyncing && <SkeletonRows />}
+
+                {/* Dados reais paginados */}
+                {!isSyncing && paginated.map((p) => (
                   <tr key={p.shopee_product_id} className="hover:bg-orange-50/30 transition-colors group">
 
-                    {/* Prioridade */}
                     <td className="px-3 py-3 text-center text-base leading-none">
                       {priorityIcon(p.diagnoses)}
                     </td>
 
-                    {/* Produto */}
                     <td className="px-3 py-3">
                       <p className="font-medium text-gray-900 text-xs leading-snug line-clamp-2 max-w-[230px]">
                         {p.product_name}
@@ -377,66 +437,29 @@ export function ShopeeProductsPanel({ products, initialAccount = 'shopee-renan' 
                       </p>
                     </td>
 
-                    {/* Impressões */}
-                    <td className="px-3 py-3 text-right text-xs text-gray-700 font-medium">
-                      {fmtNum(p.impressions)}
-                    </td>
+                    <td className="px-3 py-3 text-right text-xs text-gray-700 font-medium">{fmtNum(p.impressions)}</td>
+                    <td className="px-3 py-3 text-right text-xs text-gray-700 font-medium">{fmtNum(p.clicks)}</td>
 
-                    {/* Cliques */}
-                    <td className="px-3 py-3 text-right text-xs text-gray-700 font-medium">
-                      {fmtNum(p.clicks)}
-                    </td>
-
-                    {/* CTR */}
                     <td className="px-3 py-3 text-right">
-                      <MetricBadge
-                        value={fmtPct(p.ctr)}
-                        className={ctrClass(p.ctr, p.impressions)}
-                      />
+                      <MetricBadge value={fmtPct(p.ctr)} className={ctrClass(p.ctr, p.impressions)} />
                     </td>
 
-                    {/* Visitantes */}
-                    <td className="px-3 py-3 text-right text-xs text-gray-700 font-medium">
-                      {fmtNum(p.product_visitors)}
-                    </td>
+                    <td className="px-3 py-3 text-right text-xs text-gray-700 font-medium">{fmtNum(p.product_visitors)}</td>
+                    <td className="px-3 py-3 text-right text-xs text-gray-700 font-medium">{fmtNum(p.cart_visitors)}</td>
 
-                    {/* Carrinho */}
-                    <td className="px-3 py-3 text-right text-xs text-gray-700 font-medium">
-                      {fmtNum(p.cart_visitors)}
-                    </td>
-
-                    {/* Conv. Carrinho */}
                     <td className="px-3 py-3 text-right">
-                      <MetricBadge
-                        value={fmtPct(p.cart_conv_rate)}
-                        className={cartConvClass(p.cart_conv_rate, p.cart_visitors)}
-                      />
+                      <MetricBadge value={fmtPct(p.cart_conv_rate)} className={cartConvClass(p.cart_conv_rate, p.cart_visitors)} />
                     </td>
 
-                    {/* Pedidos */}
-                    <td className="px-3 py-3 text-right text-xs font-bold text-gray-900">
-                      {fmtNum(p.orders)}
-                    </td>
+                    <td className="px-3 py-3 text-right text-xs font-bold text-gray-900">{fmtNum(p.orders)}</td>
+                    <td className="px-3 py-3 text-right text-xs text-gray-700 font-medium">{fmtNum(p.units)}</td>
 
-                    {/* Unidades */}
-                    <td className="px-3 py-3 text-right text-xs text-gray-700 font-medium">
-                      {fmtNum(p.units)}
-                    </td>
-
-                    {/* Conv. Pedido */}
                     <td className="px-3 py-3 text-right">
-                      <MetricBadge
-                        value={fmtPct(p.order_conv_rate)}
-                        className={convClass(p.order_conv_rate, p.clicks)}
-                      />
+                      <MetricBadge value={fmtPct(p.order_conv_rate)} className={convClass(p.order_conv_rate, p.clicks)} />
                     </td>
 
-                    {/* Diagnóstico */}
-                    <td className="px-3 py-3">
-                      <DiagnosisTags diagnoses={p.diagnoses} />
-                    </td>
+                    <td className="px-3 py-3"><DiagnosisTags diagnoses={p.diagnoses} /></td>
 
-                    {/* Ação */}
                     <td className="px-3 py-3 text-center">
                       <a
                         href={`https://shopee.com.br/product/${p.shopee_product_id}`}
@@ -451,20 +474,48 @@ export function ShopeeProductsPanel({ products, initialAccount = 'shopee-renan' 
                   </tr>
                 ))}
 
-                {filtered.length === 0 && (
+                {/* Empty state */}
+                {!isSyncing && paginated.length === 0 && (
                   <tr>
                     <td colSpan={13} className="px-4 py-12 text-center text-sm text-gray-400">
                       {isDemo
-                        ? 'Nenhum dado encontrado. Clique em Sincronizar.'
-                        : 'Nenhum produto encontrado com os filtros aplicados.'}
+                        ? 'Nenhum dado. Clique em Sincronizar para buscar da Shopee.'
+                        : 'Nenhum produto com os filtros aplicados.'}
                     </td>
                   </tr>
                 )}
               </tbody>
             </table>
           </div>
-        </div>
 
+          {/* Paginação */}
+          {!isSyncing && totalPages > 1 && (
+            <div className="flex items-center justify-between px-4 py-3 border-t border-gray-100 bg-gray-50">
+              <p className="text-xs text-gray-500">
+                {firstItem}–{lastItem} de {filtered.length} produto{filtered.length !== 1 ? 's' : ''}
+              </p>
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={() => setPage((p) => Math.max(0, p - 1))}
+                  disabled={safePage === 0}
+                  className="inline-flex items-center gap-1 px-2 py-1 text-xs rounded-md border border-gray-200 disabled:opacity-40 hover:bg-white transition-colors"
+                >
+                  <ChevronLeft className="h-3.5 w-3.5" /> Anterior
+                </button>
+                <span className="px-2 text-xs text-gray-500 font-medium">
+                  {safePage + 1} / {totalPages}
+                </span>
+                <button
+                  onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
+                  disabled={safePage >= totalPages - 1}
+                  className="inline-flex items-center gap-1 px-2 py-1 text-xs rounded-md border border-gray-200 disabled:opacity-40 hover:bg-white transition-colors"
+                >
+                  Próxima <ChevronRight className="h-3.5 w-3.5" />
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
