@@ -11,12 +11,14 @@ interface ShopeeConfig {
   accessToken: string;
 }
 
-function getConfig(): ShopeeConfig {
+// SHOPEE_PARTNER_ID e SHOPEE_PARTNER_KEY são globais do App.
+// Credenciais por loja: SHOPEE_SHOP_ID_1 / SHOPEE_ACCESS_TOKEN_1, etc.
+function getConfigForShop(shopIndex: 1 | 2): ShopeeConfig {
   return {
-    partnerId:   Number((process.env.SHOPEE_PARTNER_ID   ?? '').trim() || '0'),
-    partnerKey:  (process.env.SHOPEE_PARTNER_KEY          ?? '').trim(),
-    shopId:      Number((process.env.SHOPEE_SHOP_ID       ?? '').trim() || '0'),
-    accessToken: (process.env.SHOPEE_ACCESS_TOKEN         ?? '').trim(),
+    partnerId:   Number((process.env.SHOPEE_PARTNER_ID                       ?? '').trim() || '0'),
+    partnerKey:  (process.env.SHOPEE_PARTNER_KEY                             ?? '').trim(),
+    shopId:      Number((process.env[`SHOPEE_SHOP_ID_${shopIndex}`]          ?? '').trim() || '0'),
+    accessToken: (process.env[`SHOPEE_ACCESS_TOKEN_${shopIndex}`]            ?? '').trim(),
   };
 }
 
@@ -33,8 +35,9 @@ function buildSign(path: string, timestamp: number, cfg: ShopeeConfig): string {
 export async function fetchShopeeApi<T = unknown>(
   path: string,
   params: Record<string, string | number> = {},
+  shopIndex: 1 | 2 = 1,
 ): Promise<T> {
-  const cfg = getConfig();
+  const cfg = getConfigForShop(shopIndex);
   const timestamp = Math.floor(Date.now() / 1000);
   const sign = buildSign(path, timestamp, cfg);
 
@@ -77,6 +80,7 @@ export interface ShopeeItemPerformance {
 export async function getShopeeItemPerformance(
   dateFrom: string,
   dateTo: string,
+  shopIndex: 1 | 2 = 1,
 ): Promise<ShopeeItemPerformance[]> {
 
   // 1. Lista de itens ativos da loja
@@ -85,7 +89,7 @@ export async function getShopeeItemPerformance(
     error?: string; message?: string;
   }>('/api/v2/product/get_item_list', {
     offset: 0, page_size: 100, item_status: 'NORMAL',
-  });
+  }, shopIndex);
 
   if (listRes.error && listRes.error !== '') {
     throw new Error(`Item list error: ${listRes.message ?? listRes.error}`);
@@ -120,7 +124,7 @@ export async function getShopeeItemPerformance(
     date_to:   dateTo,
     page_size: 100,
     page_no:   0,
-  });
+  }, shopIndex);
 
   const insights = insightRes.response?.business_insight ?? [];
 

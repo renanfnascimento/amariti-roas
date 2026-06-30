@@ -6,32 +6,36 @@ import { getShopeeItemPerformance } from '@/lib/shopee';
 import { ShopeeProductData } from '@/types';
 
 // ── Leitura ───────────────────────────────────────────────────────────────────
-// Schema real: shopee_product_metrics.product_id BIGINT FK → shopee_products.product_id
-// Campo de visitantes na tabela: "visitors" (não "product_visitors")
+// Schema real: shopee_product_metrics PK (product_id, shop_id, date)
+//              shopee_products        PK (product_id, shop_id)
 
 export async function getShopeeProducts(
   account = 'shopee-renan',
   dateFrom?: string,
   dateTo?: string,
+  shopIndex: 1 | 2 = 1,
 ): Promise<ShopeeProductData[]> {
   try {
     const supabase = getSupabase();
+    const shopId   = Number((process.env[`SHOPEE_SHOP_ID_${shopIndex}`] ?? '').trim() || '0');
 
     let query = supabase
       .from('shopee_product_metrics')
       .select(`
         product_id,
+        shop_id,
         date,
         impressions,
         clicks,
         orders,
         visitors,
-        shopee_products!inner(name, price)
+        shopee_products!fk_metrics_product(name, price)
       `)
       .order('impressions', { ascending: false });
 
-    if (dateFrom) query = query.gte('date', dateFrom);
-    if (dateTo)   query = query.lte('date', dateTo);
+    if (shopId > 0) query = query.eq('shop_id', shopId);
+    if (dateFrom)   query = query.gte('date', dateFrom);
+    if (dateTo)     query = query.lte('date', dateTo);
 
     const { data, error } = await query;
 
@@ -73,6 +77,7 @@ export async function getShopeeProducts(
 
 export async function syncShopeeProductsData(
   account = 'shopee-renan',
+  shopIndex: 1 | 2 = 1,
   dateFrom?: string,
   dateTo?: string,
 ): Promise<{ synced: number; error?: string }> {
@@ -81,39 +86,43 @@ export async function syncShopeeProductsData(
   const from    = dateFrom ?? weekAgo;
   const to      = dateTo   ?? today;
 
+  const shopId = Number((process.env[`SHOPEE_SHOP_ID_${shopIndex}`] ?? '').trim() || '0');
+
   try {
-    const items = await getShopeeItemPerformance(from, to);
+    const items = await getShopeeItemPerformance(from, to, shopIndex);
     if (!items.length) return { synced: 0 };
 
     const supabase = getSupabase();
 
-    // Upsert produtos — product_id BIGINT é a chave real no Supabase
+    // Upsert produtos — chave composta (product_id, shop_id)
     const { error: prodErr } = await supabase
       .from('shopee_products')
       .upsert(
         items.map((i) => ({
-          product_id: i.item_id,      // BIGINT — número direto da Shopee
+          product_id: i.item_id,
+          shop_id:    shopId,
           name:       i.item_name,
           price:      i.price,
         })),
-        { onConflict: 'product_id' },
+        { onConflict: 'product_id,shop_id' },
       );
 
     if (prodErr) throw new Error(prodErr.message);
 
-    // Upsert métricas — chave: (product_id, date)
+    // Upsert métricas — chave composta (product_id, shop_id, date)
     const { error: metErr } = await supabase
       .from('shopee_product_metrics')
       .upsert(
         items.map((i) => ({
           product_id:  i.item_id,
+          shop_id:     shopId,
           date:        to,
           impressions: i.impressions,
           clicks:      i.clicks,
           orders:      i.orders,
-          visitors:    i.product_visitors,   // "visitors" = coluna real na tabela
+          visitors:    i.product_visitors,
         })),
-        { onConflict: 'product_id,date' },
+        { onConflict: 'product_id,shop_id,date' },
       );
 
     if (metErr) throw new Error(metErr.message);

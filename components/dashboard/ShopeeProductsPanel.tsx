@@ -165,8 +165,9 @@ export function ShopeeProductsPanel({ products }: ShopeeProductsPanelProps) {
 
   function handleSync() {
     setSyncMsg(null);
+    const shopIndex: 1 | 2 = account === 'shopee-amariti' ? 2 : 1;
     startSync(async () => {
-      const result = await syncShopeeProductsData(account, dateFrom, dateTo);
+      const result = await syncShopeeProductsData(account, shopIndex, dateFrom, dateTo);
       setSyncMsg(
         result.error
           ? { ok: false, text: `Erro: ${result.error}` }
