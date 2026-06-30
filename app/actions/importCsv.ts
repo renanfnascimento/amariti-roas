@@ -191,7 +191,8 @@ export async function importShopeeCSV(
         if (dbField === 'sku' || dbField === 'product_name') {
           mapped[dbField] = raw.trim();
         } else {
-          mapped[dbField] = parsePtBrNumber(raw);
+          // Garante que campos numéricos cheguem ao Supabase como Number, não string
+          mapped[dbField] = Number(parsePtBrNumber(raw));
         }
       }
 
@@ -222,14 +223,44 @@ export async function importShopeeCSV(
 
     // ── 5. Upsert no Supabase ─────────────────────────────────────────────────
     const supabase = getSupabase();
+
+    // Pre-flight: verifica se a tabela existe antes do upsert.
+    // Schema ou tabela ausente gera TypeError: fetch failed no Next.js,
+    // mascarando o erro real. Este SELECT captura o erro Supabase legível.
+    const { error: pingErr } = await supabase
+      .from('shopee_performance_data')
+      .select('shop_id')
+      .limit(0);
+
+    if (pingErr) {
+      console.error('[importCsv] Tabela inacessível:', {
+        message: pingErr.message,
+        details: pingErr.details,
+        hint:    pingErr.hint,
+        code:    pingErr.code,
+      });
+      return {
+        imported: 0, skipped, columns: detectedCols, sheets: sheetsInData,
+        error: `Tabela inacessível (${pingErr.code ?? 'ERR'}): ${pingErr.message}${pingErr.hint ? ` — ${pingErr.hint}` : ''}`,
+      };
+    }
+
+    // Log do primeiro item para confirmar formato dos dados antes do upsert
+    console.log('[importCsv] Primeiro item do lote:', JSON.stringify(toInsert[0]));
+
     const { error: dbErr } = await supabase
       .from('shopee_performance_data')
       .upsert(toInsert as never[], { onConflict: 'shop_id,sku' });
 
     if (dbErr) {
-      console.error('[importCsv] Supabase upsert error:', dbErr.message, dbErr.details ?? '');
+      console.error('[importCsv] Supabase upsert error:', {
+        message: dbErr.message,
+        details: dbErr.details,
+        hint:    dbErr.hint,
+        code:    dbErr.code,
+      });
       return { imported: 0, skipped, columns: detectedCols, sheets: sheetsInData,
-               error: `Supabase: ${dbErr.message}` };
+               error: `Supabase (${dbErr.code ?? 'ERR'}): ${dbErr.message}` };
     }
 
     console.log(`[importCsv] OK — ${toInsert.length} upserted, ${skipped} skipped`);

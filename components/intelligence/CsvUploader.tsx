@@ -36,8 +36,8 @@ const TARGET_SHEETS = [
 
 const ACCEPT = '.xlsx,.xls,.csv';
 
-// Máximo de linhas por chamada à Server Action — evita limite de payload do Next.js
-const CHUNK_SIZE = 50;
+// Máximo de linhas por chamada à Server Action — lotes menores evitam timeout e limite de payload
+const CHUNK_SIZE = 10;
 
 // ── Mapeamento para preview de colunas (espelho do COLUMN_MAP no server action) ─
 
@@ -434,7 +434,7 @@ export function CsvUploader({ onSuccess, onClose }: CsvUploaderProps) {
                   />
                 </div>
                 <p className="text-xs text-center text-gray-400">
-                  {progress.done * CHUNK_SIZE} / {parsedRows.length} linhas enviadas
+                  Enviando {Math.min((progress.done + 1) * CHUNK_SIZE, parsedRows.length)} de {parsedRows.length}…
                 </p>
               </div>
             ) : (
