@@ -53,6 +53,9 @@ export interface ShopeeProductData {
   ctr: number;
   order_conv_rate: number;
   cart_conv_rate: number;
+  // Cruzamento Tiny — null quando SKU ainda não vinculado
+  sku:          string | null;
+  estoque_tiny: number | null;
 }
 
 export type DiagnosisType = 'critical' | 'warning' | 'ok';

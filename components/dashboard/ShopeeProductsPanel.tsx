@@ -20,6 +20,7 @@ const MOCK: ShopeeProductData[] = [
     impressions: 26,   clicks: 1,  orders: 1, units: 1,
     product_visitors: 1,  cart_visitors: 1,  revenue: 119.92,
     ctr: 3.85, order_conv_rate: 100.00, cart_conv_rate: 100.00,
+    sku: null, estoque_tiny: null,
   },
   {
     shopee_product_id: '18465873199',
@@ -28,6 +29,7 @@ const MOCK: ShopeeProductData[] = [
     impressions: 1358, clicks: 56, orders: 1, units: 3,
     product_visitors: 46, cart_visitors: 8,  revenue: 118.26,
     ctr: 4.12, order_conv_rate: 1.79, cart_conv_rate: 17.39,
+    sku: null, estoque_tiny: null,
   },
   {
     shopee_product_id: '23994919436',
@@ -36,6 +38,7 @@ const MOCK: ShopeeProductData[] = [
     impressions: 1326, clicks: 39, orders: 1, units: 1,
     product_visitors: 35, cart_visitors: 5,  revenue: 78.92,
     ctr: 2.94, order_conv_rate: 2.56, cart_conv_rate: 14.29,
+    sku: null, estoque_tiny: null,
   },
   {
     shopee_product_id: '19499092538',
@@ -44,6 +47,7 @@ const MOCK: ShopeeProductData[] = [
     impressions: 248,  clicks: 12, orders: 1, units: 1,
     product_visitors: 11, cart_visitors: 0,  revenue: 47.94,
     ctr: 4.84, order_conv_rate: 8.33, cart_conv_rate: 0.00,
+    sku: null, estoque_tiny: null,
   },
 ];
 
@@ -155,7 +159,7 @@ function SkeletonRows() {
             <div className="h-3 rounded bg-gray-200 w-3/4 mb-1.5" />
             <div className="h-2 rounded bg-gray-100 w-1/2" />
           </td>
-          {Array.from({ length: 11 }).map((_, j) => (
+          {Array.from({ length: 12 }).map((_, j) => (
             <td key={j} className="px-3 py-3 text-right">
               <div className="h-3 rounded bg-gray-200 w-10 ml-auto" />
             </td>
@@ -411,6 +415,7 @@ export function ShopeeProductsPanel({ products, initialAccount = 'shopee-renan' 
                   <ThSortable col="orders"           label="Pedidos"     right sortBy={sortBy} sortAsc={sortAsc} onSort={toggleSort} />
                   <ThSortable col="units"            label="Unidades"    right sortBy={sortBy} sortAsc={sortAsc} onSort={toggleSort} />
                   <ThSortable col="order_conv_rate"  label="Conv.Ped."   right sortBy={sortBy} sortAsc={sortAsc} onSort={toggleSort} />
+                  <th className="px-3 py-3 text-right text-[11px] font-semibold uppercase tracking-wide text-gray-400 whitespace-nowrap">Estoque (Tiny)</th>
                   <th className="px-3 py-3 text-left text-[11px] font-semibold uppercase tracking-wide text-gray-400 min-w-[180px]">Diagnóstico</th>
                   <th className="px-3 py-3 text-center text-[11px] font-semibold uppercase tracking-wide text-gray-400">Ação</th>
                 </tr>
@@ -458,6 +463,23 @@ export function ShopeeProductsPanel({ products, initialAccount = 'shopee-renan' 
                       <MetricBadge value={fmtPct(p.order_conv_rate)} className={convClass(p.order_conv_rate, p.clicks)} />
                     </td>
 
+                    <td className="px-3 py-3 text-right">
+                      {p.estoque_tiny === null ? (
+                        <span className="text-[10px] text-gray-300 font-medium">—</span>
+                      ) : p.estoque_tiny === 0 ? (
+                        <span className="inline-flex items-center rounded-full bg-red-100 px-2 py-0.5 text-xs font-bold text-red-700">
+                          0
+                        </span>
+                      ) : (
+                        <span className={cn(
+                          'inline-flex items-center rounded-full px-2 py-0.5 text-xs font-bold',
+                          p.estoque_tiny <= 5 ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700',
+                        )}>
+                          {p.estoque_tiny}
+                        </span>
+                      )}
+                    </td>
+
                     <td className="px-3 py-3"><DiagnosisTags diagnoses={p.diagnoses} /></td>
 
                     <td className="px-3 py-3 text-center">
@@ -477,7 +499,7 @@ export function ShopeeProductsPanel({ products, initialAccount = 'shopee-renan' 
                 {/* Empty state */}
                 {!isSyncing && paginated.length === 0 && (
                   <tr>
-                    <td colSpan={13} className="px-4 py-12 text-center text-sm text-gray-400">
+                    <td colSpan={14} className="px-4 py-12 text-center text-sm text-gray-400">
                       {isDemo
                         ? 'Nenhum dado. Clique em Sincronizar para buscar da Shopee.'
                         : 'Nenhum produto com os filtros aplicados.'}

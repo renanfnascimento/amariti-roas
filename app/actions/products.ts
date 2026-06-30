@@ -29,7 +29,7 @@ export async function getShopeeProducts(
         clicks,
         orders,
         visitors,
-        shopee_products!fk_metrics_product(name, price)
+        shopee_products!fk_metrics_product(name, price, sku)
       `)
       .order('impressions', { ascending: false });
 
@@ -45,28 +45,59 @@ export async function getShopeeProducts(
       return [];
     }
 
+    // ── Cruzamento com estoque do Tiny (public.produtos) ──────────────────────
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    return (data ?? []).map((row: any) => ({
-      shopee_product_id: String(row.product_id),
-      product_name:      row.shopee_products?.name  ?? '—',
-      price:             row.shopee_products?.price ?? 0,
-      account,
-      date:              row.date,
-      impressions:       row.impressions    ?? 0,
-      clicks:            row.clicks         ?? 0,
-      orders:            row.orders         ?? 0,
-      units:             0,
-      product_visitors:  row.visitors       ?? 0,
-      cart_visitors:     0,
-      revenue:           0,
-      ctr:               (row.impressions ?? 0) > 0
-                           ? ((row.clicks ?? 0) / row.impressions) * 100
-                           : 0,
-      order_conv_rate:   (row.visitors ?? 0) > 0
-                           ? ((row.orders ?? 0) / row.visitors) * 100
-                           : 0,
-      cart_conv_rate:    0,
-    }));
+    const skus = [...new Set(
+      (data ?? [])
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        .map((r: any) => r.shopee_products?.sku as string | null | undefined)
+        .filter((s): s is string => typeof s === 'string' && s.length > 0),
+    )];
+
+    const estoqueMap = new Map<string, number>();
+    if (skus.length > 0) {
+      // .schema('public') sobrescreve o schema padrão 'roas' para esta query
+      const { data: estoqueRows } = await (supabase as any)
+        .schema('public')
+        .from('produtos')
+        .select('sku, stock')
+        .in('sku', skus);
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (estoqueRows ?? []).forEach((r: any) => {
+        if (r.sku) estoqueMap.set(r.sku, r.stock ?? 0);
+      });
+    }
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return (data ?? []).map((row: any) => {
+      const sku: string | null = row.shopee_products?.sku ?? null;
+      return {
+        shopee_product_id: String(row.product_id),
+        product_name:      row.shopee_products?.name  ?? '—',
+        price:             row.shopee_products?.price ?? 0,
+        account,
+        date:              row.date,
+        impressions:       row.impressions    ?? 0,
+        clicks:            row.clicks         ?? 0,
+        orders:            row.orders         ?? 0,
+        units:             0,
+        product_visitors:  row.visitors       ?? 0,
+        cart_visitors:     0,
+        revenue:           0,
+        ctr:               (row.impressions ?? 0) > 0
+                             ? ((row.clicks ?? 0) / row.impressions) * 100
+                             : 0,
+        order_conv_rate:   (row.visitors ?? 0) > 0
+                             ? ((row.orders ?? 0) / row.visitors) * 100
+                             : 0,
+        cart_conv_rate:    0,
+        sku,
+        estoque_tiny: sku !== null && estoqueMap.has(sku)
+          ? estoqueMap.get(sku)!
+          : null,
+      };
+    });
 
   } catch (error) {
     console.error('ERRO REAL SSR:', error);
