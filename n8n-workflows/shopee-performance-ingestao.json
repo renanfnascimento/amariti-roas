@@ -1,0 +1,110 @@
+{
+  "name": "Amariti ROAS — Shopee Performance Insights → Supabase",
+  "nodes": [
+    {
+      "id": "9f3a1b2c-4d5e-6f7a-8b9c-0d1e2f3a4b5c",
+      "name": "Schedule: A cada 6 horas",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.1,
+      "position": [0, 240],
+      "parameters": {
+        "rule": {
+          "interval": [
+            { "field": "hours", "hoursInterval": 6 }
+          ]
+        }
+      }
+    },
+    {
+      "id": "1a2b3c4d-5e6f-7a8b-9c0d-1e2f3a4b5c6d",
+      "name": "Code: Buscar Performance Shopee",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [280, 240],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "// =============================================================================\n// AMARITI ROAS — Shopee Business Insights → Supabase\n// Endpoints: /api/v2/product/get_item_list\n//            /api/v2/analytics/get_shopee_business_insight\n//\n// ENV VARS obrigatórias (n8n → Settings → Environment Variables):\n//   SHOPEE_PARTNER_ID       → ID numérico do parceiro\n//   SHOPEE_PARTNER_KEY      → Chave HMAC do parceiro\n//   SHOPEE_SHOP_ID_1        → ID numérico da loja Shopee\n//   SHOPEE_ACCESS_TOKEN_1   → OAuth Access Token (renovar a cada 30 dias)\n//\n// ENV VARS para Supabase (usadas no nó HTTP Request seguinte):\n//   SUPABASE_REST_URL       → ex: https://XXXXXX.supabase.co/rest/v1\n//   SUPABASE_SERVICE_KEY    → Service Role Key (Supabase Dashboard → Settings → API)\n// =============================================================================\n\nconst crypto = require('crypto');\nconst https  = require('https');\n\n// ── Credenciais ────────────────────────────────────────────────────────────────\nconst PARTNER_ID   = String($env.SHOPEE_PARTNER_ID    || '').trim();\nconst PARTNER_KEY  = String($env.SHOPEE_PARTNER_KEY   || '').trim();\nconst SHOP_ID      = String($env.SHOPEE_SHOP_ID_1     || '').trim();\nconst ACCESS_TOKEN = String($env.SHOPEE_ACCESS_TOKEN_1 || '').trim();\n\nif (!PARTNER_ID || !PARTNER_KEY || !SHOP_ID || !ACCESS_TOKEN) {\n  throw new Error(\n    'ENV Vars ausentes. Configure: SHOPEE_PARTNER_ID, SHOPEE_PARTNER_KEY, ' +\n    'SHOPEE_SHOP_ID_1, SHOPEE_ACCESS_TOKEN_1'\n  );\n}\n\n// ── Auth HMAC-SHA256 (Shopee Open Platform v2) ─────────────────────────────────\n// Fórmula: HMAC(partner_key, partner_id + path + timestamp + access_token + shop_id)\nfunction buildAuth(apiPath) {\n  const ts   = Math.floor(Date.now() / 1000);\n  const base = PARTNER_ID + apiPath + ts + ACCESS_TOKEN + SHOP_ID;\n  const sign = crypto.createHmac('sha256', PARTNER_KEY).update(base).digest('hex');\n  return { ts, sign };\n}\n\n// ── HTTP GET com HTTPS nativo (compatível com todos os ambientes n8n) ───────────\nfunction shopeeGet(apiPath, extraParams) {\n  return new Promise(function(resolve, reject) {\n    const auth = buildAuth(apiPath);\n    const qs   = new URLSearchParams(\n      Object.assign(\n        { partner_id: PARTNER_ID, shop_id: SHOP_ID,\n          access_token: ACCESS_TOKEN, timestamp: String(auth.ts), sign: auth.sign },\n        extraParams || {}\n      )\n    );\n    const url = 'https://partner.shopeemobile.com' + apiPath + '?' + qs.toString();\n\n    https.get(url, function(res) {\n      var raw = '';\n      res.on('data', function(c) { raw += c; });\n      res.on('end', function() {\n        try   { resolve(JSON.parse(raw)); }\n        catch  { reject(new Error('JSON parse: ' + raw.slice(0, 300))); }\n      });\n    }).on('error', function(e) {\n      reject(new Error('HTTPS error em ' + apiPath + ': ' + e.message));\n    });\n  });\n}\n\n// ── Janela de datas: últimos 30 dias ───────────────────────────────────────────\nvar now      = new Date();\nvar dateTo   = now.toISOString().slice(0, 10);\nvar dateFrom = new Date(+now - 30 * 86400 * 1000).toISOString().slice(0, 10);\nvar shopIdNum = parseInt(SHOP_ID, 10);\nconsole.log('[shopee] Janela: ' + dateFrom + ' → ' + dateTo + ' | shop_id=' + shopIdNum);\n\n// =============================================================================\n// PASSO 1: Lista de produtos ativos (paginação automática)\n// =============================================================================\nvar allItems = [];\nvar offset   = 0;\nvar hasNextPage = true;\n\nwhile (hasNextPage) {\n  var listRes = await shopeeGet('/api/v2/product/get_item_list', {\n    offset:      String(offset),\n    page_size:   '100',\n    item_status: 'NORMAL',\n  });\n\n  if (listRes.error && listRes.error !== '') {\n    throw new Error('[get_item_list] Erro ' + listRes.error + ': ' + listRes.message);\n  }\n\n  var batch = (listRes.response && listRes.response.item) ? listRes.response.item : [];\n  allItems = allItems.concat(batch);\n\n  hasNextPage = (listRes.response && listRes.response.has_next_page === true)\n                || batch.length === 100;\n  offset += 100;\n\n  if (offset > 2000) {\n    console.warn('[shopee] Limite de 2000 itens atingido na paginação de produtos');\n    break;\n  }\n}\n\nconsole.log('[shopee] ' + allItems.length + ' produtos ativos');\n\n// Mapa item_id → { name, price, sku }\nvar itemMap = {};\nallItems.forEach(function(i) {\n  itemMap[i.item_id] = {\n    name:  i.item_name || '',\n    price: (i.price_info && i.price_info[0]) ? i.price_info[0].current_price : 0,\n    sku:   i.item_sku  || String(i.item_id),\n  };\n});\n\n// =============================================================================\n// PASSO 2: Business Insights — organic_views, pedidos, receita (paginação)\n// =============================================================================\nvar allInsights = [];\nvar pageNo      = 0;\nvar hasMoreInsights = true;\n\nwhile (hasMoreInsights) {\n  var insightRes = await shopeeGet('/api/v2/analytics/get_shopee_business_insight', {\n    date_from: dateFrom,\n    date_to:   dateTo,\n    page_size: '100',\n    page_no:   String(pageNo),\n  });\n\n  if (insightRes.error && insightRes.error !== '') {\n    // 'error_not_found' = sem dados para o período → trata como lista vazia\n    if (insightRes.error === 'error_not_found' || insightRes.error === 'error_param') {\n      console.warn('[shopee] Business insights vazio: ' + insightRes.message);\n      break;\n    }\n    throw new Error('[get_business_insight] Erro ' + insightRes.error + ': ' + insightRes.message);\n  }\n\n  var batchI = (insightRes.response && insightRes.response.business_insight)\n                ? insightRes.response.business_insight\n                : [];\n  allInsights = allInsights.concat(batchI);\n\n  hasMoreInsights = batchI.length === 100;\n  pageNo++;\n\n  if (pageNo > 20) {\n    console.warn('[shopee] Limite de 2000 registros de insights atingido');\n    break;\n  }\n}\n\nconsole.log('[shopee] ' + allInsights.length + ' registros de business insight');\n\n// =============================================================================\n// PASSO 3: Transforma para schema roas.shopee_performance_data\n// Colunas CRM (crm_status, cover_change_count, last_optimized_at) são\n// AUSENTES do payload → preservadas em UPDATE, defaults aplicados em INSERT\n// =============================================================================\nvar rows = allInsights\n  .map(function(row) {\n    var base     = itemMap[row.item_id] || { name: '', price: 0, sku: String(row.item_id) };\n    var visitors = Number(row.uv          || 0);\n    var orders   = Number(row.order_count || 0);\n\n    return {\n      shop_id:             shopIdNum,\n      sku:                 String(base.sku).trim(),\n      product_name:        String(row.item_name || base.name).slice(0, 255),\n      organic_views:       Number(row.exposure_count || 0),\n      organic_conversions: orders,\n      revenue:             Number(row.gmv || 0),\n      conversion_rate:     visitors > 0\n                             ? parseFloat(((orders / visitors) * 100).toFixed(4))\n                             : 0,\n      ads_spend:           0,\n      ads_conversions:     0,\n      roas_score:          0,\n      updated_at:          now.toISOString(),\n    };\n  })\n  .filter(function(r) { return r.sku !== ''; });\n\nconsole.log('[shopee] ' + rows.length + ' linhas prontas para upsert');\n\nif (rows.length === 0) {\n  console.warn('[shopee] Nenhuma linha para upsert — verificar datas ou configurações de loja');\n}\n\n// Retorna como item único; o nó HTTP Request fará 1 POST com o array completo\nreturn [{ json: { rows: rows, meta: { count: rows.length, dateFrom: dateFrom, dateTo: dateTo } } }];\n"
+      }
+    },
+    {
+      "id": "2b3c4d5e-6f7a-8b9c-0d1e-2f3a4b5c6d7e",
+      "name": "HTTP: Upsert Supabase (schema roas)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [560, 240],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.SUPABASE_REST_URL }}/shopee_performance_data",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "={{ $env.SUPABASE_SERVICE_KEY }}"
+            },
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $env.SUPABASE_SERVICE_KEY }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Accept-Profile",
+              "value": "roas"
+            },
+            {
+              "name": "Content-Profile",
+              "value": "roas"
+            },
+            {
+              "name": "Prefer",
+              "value": "resolution=merge-duplicates,return=minimal"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawBody": "={{ JSON.stringify($json.rows) }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "text"
+            }
+          }
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Schedule: A cada 6 horas": {
+      "main": [
+        [
+          {
+            "node": "Code: Buscar Performance Shopee",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code: Buscar Performance Shopee": {
+      "main": [
+        [
+          {
+            "node": "HTTP: Upsert Supabase (schema roas)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {},
+  "staticData": null,
+  "tags": []
+}
