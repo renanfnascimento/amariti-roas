@@ -149,15 +149,16 @@ function SummaryCard({ label, value, sub }: { label: string; value: string; sub?
 // ── Panel Principal ───────────────────────────────────────────────────────────
 
 interface ShopeeProductsPanelProps {
-  products: ShopeeProductData[];
+  products:        ShopeeProductData[];
+  initialAccount?: string;
 }
 
-export function ShopeeProductsPanel({ products }: ShopeeProductsPanelProps) {
+export function ShopeeProductsPanel({ products, initialAccount = 'shopee-renan' }: ShopeeProductsPanelProps) {
   const [search, setSearch] = useState('');
   const [filterAlert, setFilterAlert] = useState<'all' | 'critical' | 'warning'>('all');
   const [dateFrom, setDateFrom] = useState('2026-06-01');
   const [dateTo, setDateTo]     = useState('2026-06-21');
-  const [account, setAccount]   = useState('shopee-renan');
+  const [account, setAccount]   = useState(initialAccount);
   const [sortBy, setSortBy]     = useState<keyof ShopeeProductData>('impressions');
   const [sortAsc, setSortAsc]   = useState(false);
   const [syncMsg, setSyncMsg]   = useState<{ ok: boolean; text: string } | null>(null);

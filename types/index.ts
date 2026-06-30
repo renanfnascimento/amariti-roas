@@ -78,6 +78,8 @@ export interface CrmProduto {
   status_sugerido:      CrmStatus;
   ciclo_inicio:         string | null;
   ultima_alteracao_foto: string | null;
+  platform_id:          string | null;
+  campaign_id:          string | null;
   dias_no_ciclo:        number;
   total_impressions:    number;
   total_clicks:         number;

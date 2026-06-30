@@ -51,3 +51,20 @@ export async function registrarTrocaFoto(
   revalidatePath('/crm-anuncios');
   return {};
 }
+
+export async function updateCampaignId(
+  productId: number,
+  shopId: number,
+  campaignId: string,
+): Promise<{ error?: string }> {
+  const supabase = getSupabase();
+  const { error } = await supabase
+    .from('shopee_products')
+    .update({ campaign_id: campaignId.trim() || null })
+    .eq('product_id', productId)
+    .eq('shop_id', shopId);
+
+  if (error) return { error: error.message };
+  revalidatePath('/crm-anuncios');
+  return {};
+}
