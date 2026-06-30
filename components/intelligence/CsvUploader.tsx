@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef, useTransition, useCallback } from 'react';
-import Papa from 'papaparse';
+import { read, utils } from 'xlsx';
 import { UploadCloud, FileText, CheckCircle2, AlertCircle, X, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { importShopeeCSV, type ImportResult } from '@/app/actions/importCsv';
@@ -30,9 +30,21 @@ function Badge({ text, color }: { text: string; color: 'green' | 'blue' | 'gray'
   );
 }
 
-// ── Componente ────────────────────────────────────────────────────────────────
-
-type State = 'idle' | 'parsing' | 'preview' | 'uploading' | 'done' | 'error';
+// Colunas conhecidas para o preview de mapeamento (espelho do COLUMN_MAP no server action)
+const KNOWN_FIELDS: Record<string, string> = {
+  'sku pai': 'sku', 'sku': 'sku', 'codigo sku': 'sku', 'parent sku': 'sku', 'item sku': 'sku',
+  'nome do produto': 'product_name', 'nome': 'product_name', 'produto': 'product_name',
+  'visualizacoes da pagina do produto': 'organic_views', 'visualizacoes': 'organic_views',
+  'visitas ao produto': 'organic_views', 'visitantes': 'organic_views', 'impressoes': 'organic_views',
+  'pedidos': 'organic_conversions', 'total de pedidos': 'organic_conversions',
+  'quantidade de pedidos': 'organic_conversions', 'pedidos realizados': 'organic_conversions',
+  'gastos': 'ads_spend', 'gastos totais': 'ads_spend', 'gastos com anuncios': 'ads_spend',
+  'gasto em anuncios': 'ads_spend', 'custo de anuncio': 'ads_spend',
+  'pedidos via anuncios': 'ads_conversions', 'pedidos de anuncios': 'ads_conversions',
+  'conversoes de anuncios': 'ads_conversions',
+  'roas': 'roas_score', 'retorno sobre investimento': 'roas_score',
+  'faturamento via anuncios': 'ads_revenue', 'receita de anuncios': 'ads_revenue',
+};
 
 const FIELD_LABELS: Record<string, string> = {
   sku:                 'SKU',
@@ -45,6 +57,22 @@ const FIELD_LABELS: Record<string, string> = {
   ads_revenue:         'Receita Ads',
 };
 
+// Normaliza header para lookup no mapa (sem acentos, lowercase, espaços simples)
+function normalizeHeader(s: string): string {
+  return s
+    .toLowerCase()
+    .trim()
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .replace(/\s+/g, ' ');
+}
+
+// ── Componente ────────────────────────────────────────────────────────────────
+
+type State = 'idle' | 'parsing' | 'preview' | 'uploading' | 'done' | 'error';
+
+const ACCEPT = '.xlsx,.xls,.csv';
+
 export function CsvUploader({ shopId1, shopId2, onSuccess, onClose }: CsvUploaderProps) {
   const [state,      setState]      = useState<State>('idle');
   const [dragOver,   setDragOver]   = useState(false);
@@ -56,44 +84,74 @@ export function CsvUploader({ shopId1, shopId2, onSuccess, onClose }: CsvUploade
   const [, startT] = useTransition();
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // ── Leitura e parse do CSV no browser ────────────────────────────────────
+  // ── Leitura com SheetJS (xlsx/xls/csv) no browser ────────────────────────
   const handleFile = useCallback((file: File) => {
-    if (!file.name.match(/\.(csv|txt)$/i)) {
+    if (!file.name.match(/\.(xlsx|xls|csv)$/i)) {
       setState('error');
-      setResult({ imported: 0, skipped: 0, columns: [], error: 'Formato inválido. Use arquivo .csv ou .txt exportado pela Shopee.' });
+      setResult({ imported: 0, skipped: 0, columns: [], error: 'Formato não suportado. Use .xlsx, .xls ou .csv exportado pela Shopee.' });
       return;
     }
 
     setState('parsing');
     setFileName(file.name);
 
-    Papa.parse<Record<string, string>>(file, {
-      header:         true,
-      skipEmptyLines: true,
-      encoding:       'UTF-8',
-      complete(results) {
-        const rows = results.data;
-        if (!rows.length) {
+    const reader = new FileReader();
+
+    reader.onerror = () => {
+      setState('error');
+      setResult({ imported: 0, skipped: 0, columns: [], error: 'Não foi possível ler o arquivo.' });
+    };
+
+    reader.onload = (evt) => {
+      try {
+        const arrayBuffer = evt.target?.result as ArrayBuffer;
+
+        // SheetJS lê xlsx, xls e csv a partir de ArrayBuffer
+        const workbook = read(arrayBuffer, { type: 'array' });
+
+        const sheetName = workbook.SheetNames[0];
+        if (!sheetName) throw new Error('Planilha sem abas.');
+
+        const sheet = workbook.Sheets[sheetName];
+
+        // raw: true → valores numéricos como number (sem formatação de locale)
+        // defval: '' → células vazias viram string vazia
+        const rawRows = utils.sheet_to_json<Record<string, unknown>>(sheet, {
+          defval: '',
+          raw:    true,
+        });
+
+        if (!rawRows.length) {
           setState('error');
-          setResult({ imported: 0, skipped: 0, columns: [], error: 'Arquivo sem dados válidos.' });
+          setResult({ imported: 0, skipped: 0, columns: [], error: 'Planilha sem dados. Verifique se a aba correta está selecionada.' });
           return;
         }
+
+        // Converte todos os valores para string — o server action faz o parse numérico
+        const rows: Record<string, string>[] = rawRows.map(row =>
+          Object.fromEntries(
+            Object.entries(row).map(([k, v]) => [k, v === null || v === undefined ? '' : String(v)]),
+          ),
+        );
+
         setParsedRows(rows);
         setHeaders(Object.keys(rows[0]));
         setState('preview');
-      },
-      error(err) {
+
+      } catch (err) {
         setState('error');
-        setResult({ imported: 0, skipped: 0, columns: [], error: `Erro ao ler arquivo: ${err.message}` });
-      },
-    });
+        setResult({
+          imported: 0, skipped: 0, columns: [],
+          error: `Erro ao processar arquivo: ${err instanceof Error ? err.message : String(err)}`,
+        });
+      }
+    };
+
+    reader.readAsArrayBuffer(file);
   }, []);
 
   // ── Drag & Drop ───────────────────────────────────────────────────────────
-  function handleDragOver(e: React.DragEvent) {
-    e.preventDefault();
-    setDragOver(true);
-  }
+  function handleDragOver(e: React.DragEvent) { e.preventDefault(); setDragOver(true); }
   function handleDragLeave() { setDragOver(false); }
   function handleDrop(e: React.DragEvent) {
     e.preventDefault();
@@ -130,12 +188,12 @@ export function CsvUploader({ shopId1, shopId2, onSuccess, onClose }: CsvUploade
   return (
     <div className="border border-gray-200 rounded-xl bg-white shadow-sm overflow-hidden">
 
-      {/* Header do painel de upload */}
+      {/* Header */}
       <div className="flex items-center justify-between px-5 py-3.5 border-b border-gray-100 bg-gray-50">
         <div className="flex items-center gap-2">
           <UploadCloud className="h-4 w-4 text-orange-500" />
           <span className="text-sm font-semibold text-gray-800">
-            Importar Relatório Shopee (CSV)
+            Importar Relatório Shopee (Excel / CSV)
           </span>
         </div>
         <button
@@ -148,7 +206,7 @@ export function CsvUploader({ shopId1, shopId2, onSuccess, onClose }: CsvUploade
 
       <div className="p-5 space-y-4">
 
-        {/* Dropzone — visível nos estados idle/parsing */}
+        {/* Dropzone */}
         {(state === 'idle' || state === 'parsing') && (
           <div
             onDragOver={handleDragOver}
@@ -169,23 +227,25 @@ export function CsvUploader({ shopId1, shopId2, onSuccess, onClose }: CsvUploade
             )}
             <div className="text-center">
               <p className="text-sm font-semibold text-gray-700">
-                {state === 'parsing' ? 'Lendo arquivo…' : 'Arraste o arquivo CSV ou clique para selecionar'}
+                {state === 'parsing'
+                  ? 'Lendo planilha…'
+                  : 'Arraste o arquivo Excel (.xlsx) ou clique para selecionar'}
               </p>
               <p className="text-xs text-gray-400 mt-0.5">
-                Exportado em: Shopee → Business Insights → Relatório de Performance de Produtos
+                Suporta .xlsx · .xls · .csv — exportado em Shopee → Business Insights
               </p>
             </div>
             <input
               ref={inputRef}
               type="file"
-              accept=".csv,.txt"
+              accept={ACCEPT}
               className="hidden"
               onChange={e => { const f = e.target.files?.[0]; if (f) handleFile(f); }}
             />
           </div>
         )}
 
-        {/* Preview — após parse bem-sucedido */}
+        {/* Preview — após parse */}
         {state === 'preview' && (
           <div className="space-y-4">
 
@@ -195,7 +255,7 @@ export function CsvUploader({ shopId1, shopId2, onSuccess, onClose }: CsvUploade
               <div className="flex-1 min-w-0">
                 <p className="text-xs font-semibold text-blue-800 truncate">{fileName}</p>
                 <p className="text-xs text-blue-600 mt-0.5">
-                  {parsedRows.length} linha{parsedRows.length !== 1 ? 's' : ''} detectada{parsedRows.length !== 1 ? 's' : ''}
+                  {parsedRows.length} linha{parsedRows.length !== 1 ? 's' : ''} detectada{parsedRows.length !== 1 ? 's' : ''} · {headers.length} colunas
                 </p>
               </div>
               <button onClick={reset} className="text-blue-400 hover:text-blue-600 flex-shrink-0">
@@ -203,28 +263,14 @@ export function CsvUploader({ shopId1, shopId2, onSuccess, onClose }: CsvUploade
               </button>
             </div>
 
-            {/* Colunas detectadas */}
+            {/* Colunas detectadas e mapeadas */}
             <div>
               <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-400 mb-2">
-                Colunas do CSV ({headers.length} encontradas)
+                Colunas da planilha ({headers.length} encontradas)
               </p>
               <div className="flex flex-wrap gap-1.5">
                 {headers.map(h => {
-                  const normalized = h.toLowerCase().trim()
-                    .normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/\s+/g, ' ');
-                  // Check if this header maps to a known field
-                  const knownFields: Record<string, string> = {
-                    'sku pai': 'sku', 'sku': 'sku', 'codigo sku': 'sku', 'parent sku': 'sku', 'item sku': 'sku',
-                    'nome do produto': 'product_name', 'nome': 'product_name', 'produto': 'product_name',
-                    'visualizacoes da pagina do produto': 'organic_views', 'visualizacoes': 'organic_views',
-                    'visitantes': 'organic_views', 'impressoes': 'organic_views',
-                    'pedidos': 'organic_conversions', 'total de pedidos': 'organic_conversions',
-                    'gastos': 'ads_spend', 'gastos com anuncios': 'ads_spend', 'custo de anuncio': 'ads_spend',
-                    'pedidos via anuncios': 'ads_conversions', 'pedidos de anuncios': 'ads_conversions',
-                    'roas': 'roas_score',
-                    'faturamento via anuncios': 'ads_revenue',
-                  };
-                  const mapped = knownFields[normalized];
+                  const mapped = KNOWN_FIELDS[normalizeHeader(h)];
                   return (
                     <span key={h} className={cn(
                       'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium border',
@@ -241,42 +287,40 @@ export function CsvUploader({ shopId1, shopId2, onSuccess, onClose }: CsvUploade
               </div>
             </div>
 
-            {/* Amostra dos dados */}
-            {parsedRows.length > 0 && (
-              <div>
-                <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-400 mb-2">
-                  Prévia (3 primeiras linhas)
-                </p>
-                <div className="overflow-x-auto rounded-lg border border-gray-200">
-                  <table className="text-[10px] w-full min-w-max">
-                    <thead className="bg-gray-50">
-                      <tr>
-                        {headers.slice(0, 8).map(h => (
-                          <th key={h} className="px-2 py-1.5 text-left font-semibold text-gray-500 whitespace-nowrap max-w-[120px] truncate">
-                            {h}
-                          </th>
-                        ))}
-                        {headers.length > 8 && <th className="px-2 py-1.5 text-gray-400">+{headers.length - 8}</th>}
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-100">
-                      {parsedRows.slice(0, 3).map((row, i) => (
-                        <tr key={i}>
-                          {headers.slice(0, 8).map(h => (
-                            <td key={h} className="px-2 py-1.5 text-gray-700 whitespace-nowrap max-w-[120px] truncate" title={row[h]}>
-                              {row[h] || '—'}
-                            </td>
-                          ))}
-                          {headers.length > 8 && <td className="px-2 py-1.5 text-gray-300">…</td>}
-                        </tr>
+            {/* Amostra das 3 primeiras linhas */}
+            <div>
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-400 mb-2">
+                Prévia (3 primeiras linhas)
+              </p>
+              <div className="overflow-x-auto rounded-lg border border-gray-200">
+                <table className="text-[10px] w-full min-w-max">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      {headers.slice(0, 8).map(h => (
+                        <th key={h} className="px-2 py-1.5 text-left font-semibold text-gray-500 whitespace-nowrap max-w-[120px] truncate">
+                          {h}
+                        </th>
                       ))}
-                    </tbody>
-                  </table>
-                </div>
+                      {headers.length > 8 && <th className="px-2 py-1.5 text-gray-400">+{headers.length - 8}</th>}
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {parsedRows.slice(0, 3).map((row, i) => (
+                      <tr key={i}>
+                        {headers.slice(0, 8).map(h => (
+                          <td key={h} className="px-2 py-1.5 text-gray-700 whitespace-nowrap max-w-[120px] truncate" title={row[h]}>
+                            {row[h] || '—'}
+                          </td>
+                        ))}
+                        {headers.length > 8 && <td className="px-2 py-1.5 text-gray-300">…</td>}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
-            )}
+            </div>
 
-            {/* Seletor de loja + botão de confirmar */}
+            {/* Seletor de loja + confirmar */}
             <div className="flex items-center gap-3 pt-1">
               <div className="flex items-center gap-2">
                 <label className="text-xs font-semibold text-gray-600 whitespace-nowrap">Loja:</label>
@@ -292,7 +336,6 @@ export function CsvUploader({ shopId1, shopId2, onSuccess, onClose }: CsvUploade
                   )}
                 </select>
               </div>
-
               <div className="flex gap-2 ml-auto">
                 <button
                   onClick={reset}
@@ -324,7 +367,7 @@ export function CsvUploader({ shopId1, shopId2, onSuccess, onClose }: CsvUploade
           </div>
         )}
 
-        {/* Resultado — sucesso */}
+        {/* Sucesso */}
         {state === 'done' && result && (
           <div className="space-y-3">
             <div className="flex items-start gap-3 rounded-xl bg-emerald-50 border border-emerald-200 px-4 py-4">
@@ -345,23 +388,17 @@ export function CsvUploader({ shopId1, shopId2, onSuccess, onClose }: CsvUploade
               </div>
             </div>
             <div className="flex gap-2">
-              <button
-                onClick={reset}
-                className="px-3 py-2 text-xs font-semibold rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 transition-colors"
-              >
+              <button onClick={reset} className="px-3 py-2 text-xs font-semibold rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 transition-colors">
                 Importar outro arquivo
               </button>
-              <button
-                onClick={onClose}
-                className="px-3 py-2 text-xs font-semibold rounded-lg bg-gray-900 text-white hover:bg-gray-700 transition-colors"
-              >
+              <button onClick={onClose} className="px-3 py-2 text-xs font-semibold rounded-lg bg-gray-900 text-white hover:bg-gray-700 transition-colors">
                 Fechar
               </button>
             </div>
           </div>
         )}
 
-        {/* Resultado — erro */}
+        {/* Erro */}
         {state === 'error' && result?.error && (
           <div className="space-y-3">
             <div className="flex items-start gap-3 rounded-xl bg-red-50 border border-red-200 px-4 py-4">
@@ -371,10 +408,7 @@ export function CsvUploader({ shopId1, shopId2, onSuccess, onClose }: CsvUploade
                 <p className="text-xs text-red-700 mt-0.5">{result.error}</p>
               </div>
             </div>
-            <button
-              onClick={reset}
-              className="px-3 py-2 text-xs font-semibold rounded-lg border border-red-200 text-red-600 hover:bg-red-50 transition-colors"
-            >
+            <button onClick={reset} className="px-3 py-2 text-xs font-semibold rounded-lg border border-red-200 text-red-600 hover:bg-red-50 transition-colors">
               Tentar novamente
             </button>
           </div>
