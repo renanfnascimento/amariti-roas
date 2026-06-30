@@ -87,7 +87,7 @@ interface SheetSummary { name: string; count: number; }
 
 // ── Componente ────────────────────────────────────────────────────────────────
 
-type State = 'idle' | 'parsing' | 'preview' | 'uploading' | 'done' | 'error';
+type State = 'idle' | 'parsing' | 'local_view' | 'uploading' | 'done' | 'error';
 
 export function CsvUploader({ onSuccess, onClose }: CsvUploaderProps) {
   const [state,         setState]         = useState<State>('idle');
@@ -174,7 +174,18 @@ export function CsvUploader({ onSuccess, onClose }: CsvUploaderProps) {
         setSheetsSummary(summary);
         setParsedRows(allRows);
         setHeaders(visibleHeaders);
-        setState('preview');
+
+        // ── Diagnóstico client-side ──────────────────────────────────────────
+        // Confirma que o parsing ocorreu no browser sem depender do servidor.
+        // Abra o DevTools → Console para ver estes logs.
+        console.log('[diagnóstico] ✅ Arquivo parseado com sucesso no browser');
+        console.log('[diagnóstico] window.location.origin:', window.location.origin);
+        console.log('[diagnóstico] NEXT_PUBLIC_SUPABASE_URL em uso:', process.env.NEXT_PUBLIC_SUPABASE_URL ?? '(não definida no client)');
+        console.log('[diagnóstico] Total de linhas parseadas:', allRows.length);
+        console.log('[diagnóstico] Abas lidas:', summary.map(s => `${s.name} (${s.count})`).join(', '));
+        console.log('[diagnóstico] Linha de amostra (índice 0):', JSON.stringify(allRows[0], null, 2));
+
+        setState('local_view');
 
       } catch (err) {
         setState('error');
@@ -303,20 +314,22 @@ export function CsvUploader({ onSuccess, onClose }: CsvUploaderProps) {
           </div>
         )}
 
-        {/* Preview */}
-        {state === 'preview' && (
+        {/* Visualização local — dados carregados direto do browser, sem servidor */}
+        {state === 'local_view' && (
           <div className="space-y-4">
 
-            {/* Resumo do arquivo */}
-            <div className="flex items-start gap-3 rounded-xl bg-blue-50 border border-blue-200 px-4 py-3">
-              <FileText className="h-4 w-4 text-blue-500 flex-shrink-0 mt-0.5" />
+            {/* Banner de confirmação local */}
+            <div className="flex items-start gap-3 rounded-xl bg-emerald-50 border border-emerald-200 px-4 py-3">
+              <CheckCircle2 className="h-4 w-4 text-emerald-600 flex-shrink-0 mt-0.5" />
               <div className="flex-1 min-w-0">
-                <p className="text-xs font-semibold text-blue-800 truncate">{fileName}</p>
-                <p className="text-xs text-blue-600 mt-0.5">
-                  {parsedRows.length} linha{parsedRows.length !== 1 ? 's' : ''} no total · {headers.length} colunas
+                <p className="text-xs font-bold text-emerald-800">
+                  Dados carregados localmente — arquivo lido com sucesso no browser
+                </p>
+                <p className="text-xs text-emerald-700 mt-0.5">
+                  {parsedRows.length} linha{parsedRows.length !== 1 ? 's' : ''} · {fileName}
                 </p>
               </div>
-              <button onClick={reset} className="text-blue-400 hover:text-blue-600"><X className="h-3.5 w-3.5" /></button>
+              <button onClick={reset} className="text-emerald-400 hover:text-emerald-600"><X className="h-3.5 w-3.5" /></button>
             </div>
 
             {/* Resumo por aba */}
@@ -339,10 +352,10 @@ export function CsvUploader({ onSuccess, onClose }: CsvUploaderProps) {
               </div>
             )}
 
-            {/* Colunas detectadas e mapeadas */}
+            {/* Colunas detectadas */}
             <div>
               <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-400 mb-2">
-                Colunas da planilha ({headers.length})
+                Colunas ({headers.length}) — verde = mapeado para o banco
               </p>
               <div className="flex flex-wrap gap-1.5">
                 {headers.map(h => {
@@ -361,36 +374,45 @@ export function CsvUploader({ onSuccess, onClose }: CsvUploaderProps) {
               </div>
             </div>
 
-            {/* Amostra de dados */}
+            {/* Tabela completa — todos os dados do state local */}
             <div>
-              <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-400 mb-2">Prévia (3 primeiras linhas)</p>
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-400 mb-2">
+                Dados completos ({parsedRows.length} linhas) — renderizado direto do state local
+              </p>
               <div className="overflow-x-auto rounded-lg border border-gray-200">
-                <table className="text-[10px] w-full min-w-max">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      {headers.slice(0, 8).map(h => (
-                        <th key={h} className="px-2 py-1.5 text-left font-semibold text-gray-500 whitespace-nowrap max-w-[120px] truncate">{h}</th>
-                      ))}
-                      {headers.length > 8 && <th className="px-2 py-1.5 text-gray-400">+{headers.length - 8}</th>}
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-100">
-                    {parsedRows.slice(0, 3).map((row, i) => (
-                      <tr key={i}>
+                <div className="max-h-64 overflow-y-auto">
+                  <table className="text-[10px] w-full min-w-max">
+                    <thead className="bg-gray-50 sticky top-0">
+                      <tr>
+                        <th className="px-2 py-1.5 text-left font-semibold text-gray-400 w-8">#</th>
                         {headers.slice(0, 8).map(h => (
-                          <td key={h} className="px-2 py-1.5 text-gray-700 whitespace-nowrap max-w-[120px] truncate" title={row[h]}>
-                            {row[h] || '—'}
-                          </td>
+                          <th key={h} className={cn(
+                            'px-2 py-1.5 text-left font-semibold whitespace-nowrap max-w-[120px] truncate',
+                            KNOWN_FIELDS[normalizeHeader(h)] ? 'text-emerald-700' : 'text-gray-500',
+                          )}>{h}</th>
                         ))}
-                        {headers.length > 8 && <td className="px-2 py-1.5 text-gray-300">…</td>}
+                        {headers.length > 8 && <th className="px-2 py-1.5 text-gray-400">+{headers.length - 8}</th>}
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                      {parsedRows.map((row, i) => (
+                        <tr key={i} className="hover:bg-gray-50">
+                          <td className="px-2 py-1.5 text-gray-300 text-[9px]">{i + 1}</td>
+                          {headers.slice(0, 8).map(h => (
+                            <td key={h} className="px-2 py-1.5 text-gray-700 whitespace-nowrap max-w-[120px] truncate" title={row[h]}>
+                              {row[h] || '—'}
+                            </td>
+                          ))}
+                          {headers.length > 8 && <td className="px-2 py-1.5 text-gray-300">…</td>}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             </div>
 
-            {/* Seletor de loja + confirmar */}
+            {/* Seletor de loja + botão de upload (secundário) */}
             <div className="flex items-center gap-3 pt-1">
               <div className="flex items-center gap-2">
                 <label className="text-xs font-semibold text-gray-600 whitespace-nowrap">Loja:</label>
@@ -410,7 +432,7 @@ export function CsvUploader({ onSuccess, onClose }: CsvUploaderProps) {
                 <button onClick={handleUpload} disabled={!parsedRows.length}
                   className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-semibold rounded-lg bg-orange-500 text-white hover:bg-orange-600 disabled:opacity-50 transition-colors">
                   <UploadCloud className="h-3.5 w-3.5" />
-                  Confirmar Importação ({parsedRows.length} linhas)
+                  Salvar no Supabase ({parsedRows.length} linhas)
                 </button>
               </div>
             </div>
