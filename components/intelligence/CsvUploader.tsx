@@ -6,11 +6,20 @@ import { UploadCloud, FileText, CheckCircle2, AlertCircle, X, Loader2, Layers } 
 import { cn } from '@/lib/utils';
 import { importShopeeCSV, type ImportResult } from '@/app/actions/importCsv';
 
+// ── Conversão segura de valores SheetJS para string ──────────────────────────
+// Inteiros de 64-bit (ex: IDs Shopee "2223994919436") podem perder precisão com
+// String() quando JS os representa em notação científica. toFixed(0) preserva todos os dígitos.
+function toSafeString(v: unknown): string {
+  if (v === null || v === undefined) return '';
+  if (typeof v === 'number') {
+    return Number.isInteger(v) ? v.toFixed(0) : String(v);
+  }
+  return String(v);
+}
+
 // ── Props ─────────────────────────────────────────────────────────────────────
 
 export interface CsvUploaderProps {
-  shopId1:   number;
-  shopId2:   number;
   onSuccess: () => void;
   onClose:   () => void;
 }
@@ -30,6 +39,7 @@ const ACCEPT = '.xlsx,.xls,.csv';
 // ── Mapeamento para preview de colunas (espelho do COLUMN_MAP no server action) ─
 
 const KNOWN_FIELDS: Record<string, string> = {
+  'id do item': 'sku',  // coluna principal do Business Insights
   'sku pai': 'sku', 'sku do produto': 'sku', 'sku': 'sku', 'codigo sku': 'sku',
   'nome do produto': 'product_name', 'nome': 'product_name', 'produto': 'product_name',
   'visualizacoes da pagina do produto': 'organic_views', 'visualizacoes': 'organic_views',
@@ -76,14 +86,15 @@ interface SheetSummary { name: string; count: number; }
 
 type State = 'idle' | 'parsing' | 'preview' | 'uploading' | 'done' | 'error';
 
-export function CsvUploader({ shopId1, shopId2, onSuccess, onClose }: CsvUploaderProps) {
+export function CsvUploader({ onSuccess, onClose }: CsvUploaderProps) {
   const [state,         setState]         = useState<State>('idle');
   const [dragOver,      setDragOver]      = useState(false);
   const [parsedRows,    setParsedRows]    = useState<Record<string, string>[]>([]);
   const [headers,       setHeaders]       = useState<string[]>([]);
   const [sheetsSummary, setSheetsSummary] = useState<SheetSummary[]>([]);
   const [fileName,      setFileName]      = useState('');
-  const [shopId,        setShopId]        = useState<number>(shopId1 || shopId2 || 0);
+  // Índice da loja (1 ou 2) — o server action resolve o shop_id real via env
+  const [shopIndex,     setShopIndex]     = useState<1 | 2>(1);
   const [result,        setResult]        = useState<ImportResult | null>(null);
   const [, startT] = useTransition();
   const inputRef = useRef<HTMLInputElement>(null);
@@ -123,7 +134,7 @@ export function CsvUploader({ shopId1, shopId2, onSuccess, onClose }: CsvUploade
 
           const rows: Record<string, string>[] = raw.map(row => ({
             ...Object.fromEntries(
-              Object.entries(row).map(([k, v]) => [k, v === null || v === undefined ? '' : String(v)]),
+              Object.entries(row).map(([k, v]) => [k, toSafeString(v)]),
             ),
             shopee_diagnosis: sheetName,
           }));
@@ -140,7 +151,7 @@ export function CsvUploader({ shopId1, shopId2, onSuccess, onClose }: CsvUploade
             const raw = utils.sheet_to_json<Record<string, unknown>>(sheet, { defval: '', raw: true });
             const rows: Record<string, string>[] = raw.map(row =>
               Object.fromEntries(
-                Object.entries(row).map(([k, v]) => [k, v === null || v === undefined ? '' : String(v)]),
+                Object.entries(row).map(([k, v]) => [k, toSafeString(v)]),
               ),
             );
             allRows.push(...rows);
@@ -185,10 +196,10 @@ export function CsvUploader({ shopId1, shopId2, onSuccess, onClose }: CsvUploade
 
   // ── Envio para Server Action ───────────────────────────────────────────────
   function handleUpload() {
-    if (!parsedRows.length || !shopId) return;
+    if (!parsedRows.length) return;
     setState('uploading');
     startT(async () => {
-      const res = await importShopeeCSV(parsedRows, shopId);
+      const res = await importShopeeCSV(parsedRows, shopIndex);
       setResult(res);
       setState(res.error ? 'error' : 'done');
       if (!res.error) onSuccess();
@@ -350,17 +361,20 @@ export function CsvUploader({ shopId1, shopId2, onSuccess, onClose }: CsvUploade
             <div className="flex items-center gap-3 pt-1">
               <div className="flex items-center gap-2">
                 <label className="text-xs font-semibold text-gray-600 whitespace-nowrap">Loja:</label>
-                <select value={shopId} onChange={e => setShopId(Number(e.target.value))} className={selectClass}>
-                  {shopId1 > 0 && <option value={shopId1}>Shopee Renan (ID {shopId1})</option>}
-                  {shopId2 > 0 && <option value={shopId2}>Shopee Amariti (ID {shopId2})</option>}
-                  {shopId1 === 0 && shopId2 === 0 && <option value={0} disabled>Configure SHOPEE_SHOP_ID_1 no env</option>}
+                <select
+                  value={shopIndex}
+                  onChange={e => setShopIndex(Number(e.target.value) as 1 | 2)}
+                  className={selectClass}
+                >
+                  <option value={1}>Shopee Renan (Loja 1)</option>
+                  <option value={2}>Shopee Amariti (Loja 2)</option>
                 </select>
               </div>
               <div className="flex gap-2 ml-auto">
                 <button onClick={reset} className="px-3 py-2 text-xs font-semibold rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 transition-colors">
                   Trocar arquivo
                 </button>
-                <button onClick={handleUpload} disabled={!shopId}
+                <button onClick={handleUpload} disabled={!parsedRows.length}
                   className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-semibold rounded-lg bg-orange-500 text-white hover:bg-orange-600 disabled:opacity-50 transition-colors">
                   <UploadCloud className="h-3.5 w-3.5" />
                   Confirmar Importação ({parsedRows.length} linhas)

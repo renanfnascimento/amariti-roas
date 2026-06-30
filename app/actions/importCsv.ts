@@ -28,7 +28,8 @@ function norm(s: string): string {
 // Cobre Business Insights, Relatório de Ads e Diagnóstico de Produtos
 
 const COLUMN_MAP: Record<string, string> = {
-  // ── SKU ────────────────────────────────────────────────────────────────────
+  // ── SKU / ID do Item ──────────────────────────────────────────────────────
+  'id do item':                           'sku',   // coluna exportada pelo Business Insights
   'sku pai':                              'sku',
   'sku do produto':                       'sku',
   'sku':                                  'sku',
@@ -133,12 +134,20 @@ function parsePtBrNumber(raw: string): number {
 // ── Server Action principal ───────────────────────────────────────────────────
 
 export async function importShopeeCSV(
-  rawRows: Record<string, string>[],
-  shopId:  number,
+  rawRows:   Record<string, string>[],
+  shopIndex: 1 | 2,
 ): Promise<ImportResult> {
   if (!rawRows.length) return { imported: 0, skipped: 0, columns: [], error: 'Arquivo vazio' };
-  if (!shopId || shopId === 0) {
-    return { imported: 0, skipped: 0, columns: [], error: 'Selecione a loja antes de importar' };
+
+  // Lê o shop_id real a partir do env — nunca exposto ao cliente
+  const shopId = Number(
+    (process.env[`SHOPEE_SHOP_ID_${shopIndex}`] ?? '').trim() || '0',
+  );
+  if (!shopId) {
+    return {
+      imported: 0, skipped: 0, columns: [],
+      error: `SHOPEE_SHOP_ID_${shopIndex} não configurado no servidor. Verifique o arquivo .env.local.`,
+    };
   }
 
   // Detecta colunas e monta índice: header original → campo da tabela

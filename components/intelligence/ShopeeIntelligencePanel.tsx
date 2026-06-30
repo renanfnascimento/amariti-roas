@@ -306,8 +306,6 @@ export function ShopeeIntelligencePanel({ shopId1, shopId2 }: ShopeeIntelligence
         {showUploader && (
           <div className="mt-3">
             <CsvUploader
-              shopId1={shopId1}
-              shopId2={shopId2}
               onSuccess={() => fetchData(shopFilter, period)}
               onClose={() => setShowUploader(false)}
             />
@@ -458,12 +456,12 @@ export function ShopeeIntelligencePanel({ shopId1, shopId2 }: ShopeeIntelligence
                         <Zap className="h-8 w-8 text-gray-200" />
                         <p className="text-sm font-semibold text-gray-500">
                           {rows.length === 0
-                            ? 'Aguardando dados do n8n'
+                            ? 'Sem dados ainda'
                             : 'Nenhum produto nesta aba'}
                         </p>
                         <p className="text-xs text-gray-400 max-w-xs text-center leading-relaxed">
                           {rows.length === 0
-                            ? <>Configure o fluxo n8n para ingerir dados da Shopee Open Platform.<br/>A tabela <code className="bg-gray-100 rounded px-1">roas.shopee_performance_data</code> já está pronta.</>
+                            ? 'Importe um relatório .xlsx via o botão "Importar CSV" acima para ver os dados aqui.'
                             : 'Mude o filtro de aba ou ajuste o threshold de ROAS.'}
                         </p>
                       </div>
