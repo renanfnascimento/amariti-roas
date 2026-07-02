@@ -46,7 +46,7 @@ const NAV_GROUPS: NavGroup[] = [
       { href: '/crm-anuncios',                        label: 'CRM Anúncios',        sublabel: 'Ciclo de vida',    icon: Kanban      },
       { href: '/dashboard/shopee-intelligence',       label: 'Inteligência Shopee', sublabel: 'ROAS · n8n',       icon: BarChart2   },
       { label: 'Shopee Amariti',    icon: ShoppingBag,  disabled: true },
-      { label: 'Mercado Livre',     icon: ShoppingCart, disabled: true },
+      { href: '/dashboard/vendas-ml', label: 'Mercado Livre', sublabel: 'Performance · ROAS', icon: ShoppingCart },
       { label: 'Amazon',            icon: Package,      disabled: true },
       { label: 'Magalu',            icon: Store,        disabled: true },
     ],

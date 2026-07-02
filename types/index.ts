@@ -35,6 +35,17 @@ export interface ShopeeMetricsRow {
   };
 }
 
+// ── Mercado Livre: Performance e ROAS ─────────────────────────────────────────
+
+export interface MlPerformanceRow {
+  id:            string;
+  date:          string;
+  campaign_name: string;
+  ad_spend:      number;
+  revenue:       number;
+  orders_count:  number;
+}
+
 // ── Produto Analytics ─────────────────────────────────────────────────────────
 
 export interface ShopeeProductData {
