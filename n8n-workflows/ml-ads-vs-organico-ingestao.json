@@ -145,7 +145,8 @@
         },
         "sendBody": true,
         "contentType": "raw",
-        "rawBody": "={{ JSON.stringify($json.campaigns) }}",
+        "rawContentType": "application/json",
+        "body": "={{ JSON.stringify($json.campaigns) }}",
         "options": {}
       },
       "id": "8c5e2f7a-1b4d-4e9c-a3f6-7d2b9e5c1a48",
@@ -175,7 +176,8 @@
         },
         "sendBody": true,
         "contentType": "raw",
-        "rawBody": "={{ JSON.stringify($json.aggregates) }}",
+        "rawContentType": "application/json",
+        "body": "={{ JSON.stringify($json.aggregates) }}",
         "options": {}
       },
       "id": "75e7a361-868a-4e89-b513-e608f2c49784",
