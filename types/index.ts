@@ -51,10 +51,12 @@ export interface MlPerformanceRow {
 
 // Agregado diário por fonte de tráfego, alimentado pelo webhook
 // app/api/n8n/traffic-ads/route.ts (upsert em date + traffic_source).
+export type TrafficAdsSource = 'ml_organico' | 'ml_ads';
+
 export interface TrafficPerformanceAdsRow {
   id:             string;
   date:           string;
-  traffic_source: MlTrafficSource;
+  traffic_source: TrafficAdsSource;
   ad_spend:       number;
   revenue:        number;
   orders_count:   number;

@@ -1,6 +1,6 @@
 -- Migration: create_traffic_performance_ads
--- Projeto: Amariti ROAS (dndnamqwnaguvuzvobrv)
--- Executar no SQL Editor do Supabase: https://supabase.com/dashboard/project/dndnamqwnaguvuzvobrv/sql
+-- Projeto: Amariti ROAS (dmccgehdvlmsvejgblqx)
+-- Executar no SQL Editor do Supabase: https://supabase.com/dashboard/project/dmccgehdvlmsvejgblqx/sql
 --
 -- Tabela de ingestao agregada (1 linha por dia + fonte de trafego) alimentada
 -- pelo webhook app/api/n8n/traffic-ads/route.ts. Diferente de

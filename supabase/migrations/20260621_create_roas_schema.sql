@@ -1,6 +1,6 @@
 -- Migration: create_roas_schema_and_tables
--- Projeto: Amariti ROAS (dndnamqwnaguvuzvobrv)
--- Executar no SQL Editor do Supabase: https://supabase.com/dashboard/project/dndnamqwnaguvuzvobrv/sql
+-- Projeto: Amariti ROAS (dmccgehdvlmsvejgblqx)
+-- Executar no SQL Editor do Supabase: https://supabase.com/dashboard/project/dmccgehdvlmsvejgblqx/sql
 --
 -- Schema isolado para não misturar com as tabelas do bot de WhatsApp/ERP.
 

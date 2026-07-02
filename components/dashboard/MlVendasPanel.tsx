@@ -62,7 +62,7 @@ export function MlVendasPanel({ rows, trafficAdsRows }: MlVendasPanelProps) {
         {/* Ingestão via webhook n8n (traffic_performance_ads) */}
         <div>
           <h2 className="text-sm font-semibold text-gray-700 mb-2">
-            Performance por Dia e Canal (webhook n8n)
+            Orgânico vs Ads (agregado diário via webhook n8n)
           </h2>
           <TrafficAdsPerformanceTable rows={trafficAdsRows} />
         </div>

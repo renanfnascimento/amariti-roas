@@ -1,6 +1,6 @@
 -- Migration: create_ml_performance_roas
--- Projeto: Amariti ROAS (dndnamqwnaguvuzvobrv)
--- Executar no SQL Editor do Supabase: https://supabase.com/dashboard/project/dndnamqwnaguvuzvobrv/sql
+-- Projeto: Amariti ROAS (dmccgehdvlmsvejgblqx)
+-- Executar no SQL Editor do Supabase: https://supabase.com/dashboard/project/dmccgehdvlmsvejgblqx/sql
 --
 -- SUPERADA por 20260703_move_ml_performance_roas_to_public.sql — o schema 'roas'
 -- exige habilitar "Exposed schemas" manualmente no painel do Supabase, o que a

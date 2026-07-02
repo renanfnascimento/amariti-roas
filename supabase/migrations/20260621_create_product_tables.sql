@@ -1,5 +1,5 @@
 -- Migration: create_product_analytics_tables
--- Executar em: https://supabase.com/dashboard/project/dndnamqwnaguvuzvobrv/sql
+-- Executar em: https://supabase.com/dashboard/project/dmccgehdvlmsvejgblqx/sql
 
 CREATE TABLE IF NOT EXISTS roas.shopee_products (
     id                UUID    PRIMARY KEY DEFAULT uuid_generate_v4(),

@@ -1,5 +1,5 @@
 -- Migration: create_product_metrics_table
--- Executar em: https://supabase.com/dashboard/project/dndnamqwnaguvuzvobrv/sql
+-- Executar em: https://supabase.com/dashboard/project/dmccgehdvlmsvejgblqx/sql
 --
 -- Assume que roas.shopee_products JÁ EXISTE com product_id BIGINT PRIMARY KEY.
 -- Se não existir, crie-a primeiro:

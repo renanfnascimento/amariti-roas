@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabasePublic } from '@/lib/supabase';
-import { MlTrafficSource } from '@/types';
+import { TrafficAdsSource } from '@/types';
 
 interface TrafficAdsPayload {
   date: string;
-  traffic_source: MlTrafficSource;
+  traffic_source: TrafficAdsSource;
   ad_spend: number;
   revenue: number;
   orders_count: number;
@@ -15,7 +15,7 @@ function isValidRow(row: unknown): row is TrafficAdsPayload {
   const r = row as Record<string, unknown>;
   return (
     typeof r.date === 'string' &&
-    (r.traffic_source === 'ads' || r.traffic_source === 'organic') &&
+    (r.traffic_source === 'ml_ads' || r.traffic_source === 'ml_organico') &&
     typeof r.ad_spend === 'number' &&
     typeof r.revenue === 'number' &&
     typeof r.orders_count === 'number'
@@ -44,7 +44,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(
       {
         error:
-          'Nenhum registro válido — esperado: date, traffic_source ("ads" | "organic"), ad_spend, revenue, orders_count',
+          'Nenhum registro válido — esperado: date, traffic_source ("ml_ads" | "ml_organico"), ad_spend, revenue, orders_count',
       },
       { status: 400 }
     );

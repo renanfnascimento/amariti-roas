@@ -1,6 +1,6 @@
 -- Migration: move_ml_performance_roas_to_public
--- Projeto: Amariti ROAS (dndnamqwnaguvuzvobrv)
--- Executar no SQL Editor do Supabase: https://supabase.com/dashboard/project/dndnamqwnaguvuzvobrv/sql
+-- Projeto: Amariti ROAS (dmccgehdvlmsvejgblqx)
+-- Executar no SQL Editor do Supabase: https://supabase.com/dashboard/project/dmccgehdvlmsvejgblqx/sql
 --
 -- A migração anterior (20260702_create_ml_performance_roas.sql) criava a tabela
 -- no schema 'roas', que não está na lista de "Exposed schemas" da Data API —

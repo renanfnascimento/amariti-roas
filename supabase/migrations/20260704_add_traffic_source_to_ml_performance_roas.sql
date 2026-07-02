@@ -1,6 +1,6 @@
 -- Migration: add_traffic_source_to_ml_performance_roas
--- Projeto: Amariti ROAS (dndnamqwnaguvuzvobrv)
--- Executar no SQL Editor do Supabase: https://supabase.com/dashboard/project/dndnamqwnaguvuzvobrv/sql
+-- Projeto: Amariti ROAS (dmccgehdvlmsvejgblqx)
+-- Executar no SQL Editor do Supabase: https://supabase.com/dashboard/project/dmccgehdvlmsvejgblqx/sql
 --
 -- Separa vendas orgânicas de vendas via Mercado Ads na conta "Momento Vestidos".
 -- Idempotente: pode ser executada mesmo se a coluna já existir.
