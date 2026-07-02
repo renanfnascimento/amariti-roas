@@ -1,10 +1,9 @@
 // Seed de teste para o painel Performance e ROAS - Mercado Livre.
 //
-// Pré-requisitos (uma vez só, no projeto dndnamqwnaguvuzvobrv):
-//   1. Rodar supabase/migrations/20260702_create_ml_performance_roas.sql no SQL Editor.
-//   2. Em Project Settings > API > Data API > Exposed schemas, adicionar "roas"
-//      (sem isso o PostgREST recusa qualquer request para o schema com "Invalid schema: roas",
-//      mesmo com a tabela e as policies corretas).
+// Pré-requisito (uma vez só, no projeto dndnamqwnaguvuzvobrv):
+//   Rodar supabase/migrations/20260703_move_ml_performance_roas_to_public.sql
+//   (cria public.ml_performance_roas — schema 'public' já vem exposto por
+//   padrão, sem precisar mexer em "Exposed schemas" no painel).
 // Este script não roda DDL, apenas insere linhas.
 //
 // Uso:
@@ -22,7 +21,7 @@ if (!url?.startsWith('https://') || !key || key.length < 20) {
   process.exit(1);
 }
 
-const supabase = createClient(url, key, { db: { schema: 'roas' } });
+const supabase = createClient(url, key);
 
 interface SeedRow {
   date: string;

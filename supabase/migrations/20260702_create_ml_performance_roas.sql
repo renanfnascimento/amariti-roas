@@ -2,6 +2,11 @@
 -- Projeto: Amariti ROAS (dndnamqwnaguvuzvobrv)
 -- Executar no SQL Editor do Supabase: https://supabase.com/dashboard/project/dndnamqwnaguvuzvobrv/sql
 --
+-- SUPERADA por 20260703_move_ml_performance_roas_to_public.sql — o schema 'roas'
+-- exige habilitar "Exposed schemas" manualmente no painel do Supabase, o que a
+-- usuária pediu para evitar. A tabela foi movida para 'public'. Mantido apenas
+-- para histórico; não execute este arquivo isoladamente.
+--
 -- Painel de Performance e ROAS - Mercado Livre. Schema isolado 'roas' para não
 -- misturar com as tabelas do bot de WhatsApp/ERP (mesma convenção das demais
 -- tabelas de tráfego já existentes nesse schema).

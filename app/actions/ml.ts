@@ -1,14 +1,14 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
-import { getSupabase } from '@/lib/supabase';
+import { getSupabasePublic } from '@/lib/supabase';
 import { MlPerformanceRow } from '@/types';
 
 export async function getMlPerformance(
   dateFrom?: string,
   dateTo?: string
 ): Promise<MlPerformanceRow[]> {
-  const supabase = getSupabase();
+  const supabase = getSupabasePublic();
 
   let query = supabase
     .from('ml_performance_roas')
@@ -32,7 +32,7 @@ export async function updateMlPerformance(
   id: string,
   updates: { ad_spend: number; revenue: number }
 ): Promise<void> {
-  const supabase = getSupabase();
+  const supabase = getSupabasePublic();
 
   const { error } = await supabase
     .from('ml_performance_roas')

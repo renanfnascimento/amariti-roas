@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getSupabase } from '@/lib/supabase';
+import { getSupabasePublic } from '@/lib/supabase';
 
 interface MlRoasPayload {
   date: string;
@@ -51,7 +51,7 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const supabase = getSupabase();
+  const supabase = getSupabasePublic();
   const { data, error } = await supabase.from('ml_performance_roas').insert(rows).select('id');
 
   if (error) {
