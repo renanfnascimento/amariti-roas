@@ -1,0 +1,191 @@
+{
+  "name": "dados mercado livre momento app roas",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            { "field": "days", "daysInterval": 1, "triggerAtHour": 23, "triggerAtMinute": 50 }
+          ]
+        }
+      },
+      "id": "b7a2ec14-e204-4a2e-b684-e259de47c071",
+      "name": "Gatilho Diário (23:50)1",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.1,
+      "position": [240, 144]
+    },
+    {
+      "parameters": {
+        "url": "https://api.mercadolibre.com/users/me",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "oAuth2Api",
+        "options": {}
+      },
+      "id": "81af25be-a036-4032-936a-a0ccbf2d7ff8",
+      "name": "Pegar Meu ID (Seller)1",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [464, 144]
+    },
+    {
+      "parameters": {
+        "url": "https://api.mercadolibre.com/orders/search",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "oAuth2Api",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            { "name": "seller", "value": "={{ $json.id }}" },
+            { "name": "order.date_created.from", "value": "={{ $now.startOf('day').toISO() }}" },
+            { "name": "order.date_created.to", "value": "={{ $now.toISO() }}" }
+          ]
+        },
+        "options": {}
+      },
+      "id": "3344c6f1-bcfa-4325-a448-74fc9061e8cc",
+      "name": "Puxar Vendas Totais (ML)1",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [688, 60]
+    },
+    {
+      "parameters": {
+        "url": "https://api.mercadolibre.com/advertising/advertisers",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "oAuth2Api",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            { "name": "product_id", "value": "PADS" }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Api-Version", "value": "1" }
+          ]
+        },
+        "options": {}
+      },
+      "id": "105c05f4-6890-40d8-9175-34c522af3549",
+      "name": "Buscar Advertiser ID (ML Ads)1",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [688, 260]
+    },
+    {
+      "parameters": {
+        "url": "=https://api.mercadolibre.com/marketplace/advertising/MLB/advertisers/{{ $json.advertisers[0].advertiser_id }}/product_ads/campaigns/search",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "oAuth2Api",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            { "name": "date_from", "value": "={{ $now.startOf('day').toFormat('yyyy-LL-dd') }}" },
+            { "name": "date_to", "value": "={{ $now.toFormat('yyyy-LL-dd') }}" },
+            { "name": "metrics_summary", "value": "true" },
+            { "name": "metrics", "value": "cost,direct_amount,indirect_amount,direct_items_quantity,indirect_items_quantity" }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Api-Version", "value": "1" }
+          ]
+        },
+        "options": {}
+      },
+      "id": "a74af818-5df2-4ef4-bc83-46cff7b64aad",
+      "name": "Puxar Custos de Ads (ML)1",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [912, 260]
+    },
+    {
+      "parameters": {
+        "mode": "append",
+        "numberInputs": 2
+      },
+      "id": "f4b1c9d2-6a3e-4f8b-9c2d-1a7e5b3c8d94",
+      "name": "Aguardar Vendas e Ads1",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3,
+      "position": [1136, 160]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "// Roda 1x/dia. Usa a data de execucao (UTC) para separar o total de vendas do dia\n// (orders/search) do que foi atribuido a Ads (product_ads/campaigns/search).\n// A API de pedidos do ML nao marca pedido individual como \"veio de ads\" -\n// por isso o organico e calculado por diferenca (total - atribuido a ads).\nconst today = new Date().toISOString().slice(0, 10);\n\nconst ordersResponse = $('Puxar Vendas Totais (ML)1').first().json;\nconst adsResponse = $('Puxar Custos de Ads (ML)1').first().json;\n\n// Total do dia (vendas pagas) vindo do orders/search\nconst paidOrders = (ordersResponse.results || []).filter(\n  (o) => o.date_created && o.date_created.slice(0, 10) === today && o.status === 'paid'\n);\nconst totalRevenue = paidOrders.reduce((sum, o) => sum + (o.paid_amount || 0), 0);\nconst totalOrders = paidOrders.length;\n\n// Metricas atribuidas a Ads vindo do product_ads/campaigns/search\n// ATENCAO: confira os nomes de campo abaixo (metrics/metrics_summary, cost,\n// direct_amount, indirect_amount, direct_items_quantity, indirect_items_quantity)\n// contra o JSON real retornado pelo no anterior, ajustando se necessario.\nconst campaigns = adsResponse.results || [];\nlet adsSpend = 0;\nlet adsRevenue = 0;\nlet adsOrders = 0;\n\nfor (const campaign of campaigns) {\n  const m = campaign.metrics || campaign.metrics_summary || {};\n  adsSpend += m.cost || 0;\n  adsRevenue += (m.direct_amount || 0) + (m.indirect_amount || 0);\n  adsOrders += (m.direct_items_quantity || 0) + (m.indirect_items_quantity || 0);\n}\n\n// Organico = total do dia menos o que ja foi atribuido a Ads\nconst organicRevenue = Math.max(totalRevenue - adsRevenue, 0);\nconst organicOrders = Math.max(totalOrders - adsOrders, 0);\n\nreturn [\n  {\n    json: {\n      date: today,\n      traffic_source: 'ml_organico',\n      ad_spend: 0,\n      revenue: Number(organicRevenue.toFixed(2)),\n      orders_count: organicOrders,\n    },\n  },\n  {\n    json: {\n      date: today,\n      traffic_source: 'ml_ads',\n      ad_spend: Number(adsSpend.toFixed(2)),\n      revenue: Number(adsRevenue.toFixed(2)),\n      orders_count: adsOrders,\n    },\n  },\n];"
+      },
+      "id": "3e7c58c6-e814-4b6a-a3e7-108e06b57355",
+      "name": "Agregar Ads vs Organico1",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1360, 160]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://dmccgehdvlmsvejgblqx.supabase.co/rest/v1/traffic_performance_ads",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            { "name": "on_conflict", "value": "date,traffic_source" }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Prefer", "value": "resolution=merge-duplicates,return=minimal" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json }}",
+        "options": {}
+      },
+      "id": "75e7a361-868a-4e89-b513-e608f2c49784",
+      "name": "Enviar para Supabase (traffic-ads)1",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [1584, 160]
+    }
+  ],
+  "connections": {
+    "Gatilho Diário (23:50)1": {
+      "main": [[{ "node": "Pegar Meu ID (Seller)1", "type": "main", "index": 0 }]]
+    },
+    "Pegar Meu ID (Seller)1": {
+      "main": [
+        [
+          { "node": "Puxar Vendas Totais (ML)1", "type": "main", "index": 0 },
+          { "node": "Buscar Advertiser ID (ML Ads)1", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Buscar Advertiser ID (ML Ads)1": {
+      "main": [[{ "node": "Puxar Custos de Ads (ML)1", "type": "main", "index": 0 }]]
+    },
+    "Puxar Vendas Totais (ML)1": {
+      "main": [[{ "node": "Aguardar Vendas e Ads1", "type": "main", "index": 0 }]]
+    },
+    "Puxar Custos de Ads (ML)1": {
+      "main": [[{ "node": "Aguardar Vendas e Ads1", "type": "main", "index": 1 }]]
+    },
+    "Aguardar Vendas e Ads1": {
+      "main": [[{ "node": "Agregar Ads vs Organico1", "type": "main", "index": 0 }]]
+    },
+    "Agregar Ads vs Organico1": {
+      "main": [[{ "node": "Enviar para Supabase (traffic-ads)1", "type": "main", "index": 0 }]]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {},
+  "staticData": null,
+  "tags": []
+}

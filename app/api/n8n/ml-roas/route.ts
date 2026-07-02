@@ -9,6 +9,10 @@ interface MlRoasPayload {
   revenue: number;
   orders_count: number;
   traffic_source?: MlTrafficSource;
+  // Opcionais: alimentam o CTR do Centro de Comando de CRO (prints/clicks
+  // por campanha na API de Ads do ML).
+  impressions?: number;
+  clicks?: number;
 }
 
 function isValidRow(row: unknown): row is MlRoasPayload {
@@ -20,7 +24,9 @@ function isValidRow(row: unknown): row is MlRoasPayload {
     typeof r.ad_spend === 'number' &&
     typeof r.revenue === 'number' &&
     typeof r.orders_count === 'number' &&
-    (r.traffic_source === undefined || r.traffic_source === 'ads' || r.traffic_source === 'organic')
+    (r.traffic_source === undefined || r.traffic_source === 'ads' || r.traffic_source === 'organic') &&
+    (r.impressions === undefined || typeof r.impressions === 'number') &&
+    (r.clicks === undefined || typeof r.clicks === 'number')
   );
 }
 

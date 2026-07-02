@@ -8,6 +8,10 @@ interface TrafficAdsPayload {
   ad_spend: number;
   revenue: number;
   orders_count: number;
+  // Opcionais: o Centro de Comando de CRO usa CTR (clicks/impressions);
+  // o n8n deve passar a enviá-los (prints/clicks da API de Ads do ML).
+  impressions?: number;
+  clicks?: number;
 }
 
 function isValidRow(row: unknown): row is TrafficAdsPayload {
@@ -18,7 +22,9 @@ function isValidRow(row: unknown): row is TrafficAdsPayload {
     (r.traffic_source === 'ml_ads' || r.traffic_source === 'ml_organico') &&
     typeof r.ad_spend === 'number' &&
     typeof r.revenue === 'number' &&
-    typeof r.orders_count === 'number'
+    typeof r.orders_count === 'number' &&
+    (r.impressions === undefined || typeof r.impressions === 'number') &&
+    (r.clicks === undefined || typeof r.clicks === 'number')
   );
 }
 

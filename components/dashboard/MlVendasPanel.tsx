@@ -4,8 +4,10 @@ import { useMemo } from 'react';
 import { KpiCard } from '@/components/dashboard/KpiCard';
 import { MlDateRangeFilter } from '@/components/MlDateRangeFilter';
 import { MlPerformanceChart } from '@/components/dashboard/MlPerformanceChart';
-import { MlPerformanceTable } from '@/components/MlPerformanceTable';
+import { ActionableInsightsFeed } from '@/components/dashboard/ActionableInsightsFeed';
+import { SmartMatrixTable } from '@/components/SmartMatrixTable';
 import { TrafficAdsPerformanceTable } from '@/components/TrafficAdsPerformanceTable';
+import { buildCroRows } from '@/lib/croRules';
 import { MlPerformanceRow, TrafficPerformanceAdsRow } from '@/types';
 
 function fmtBRL(v: number) {
@@ -18,6 +20,8 @@ interface MlVendasPanelProps {
 }
 
 export function MlVendasPanel({ rows, trafficAdsRows }: MlVendasPanelProps) {
+  const croRows = useMemo(() => buildCroRows(rows, trafficAdsRows), [rows, trafficAdsRows]);
+
   const { totalRevenue, organicRevenue, adsRevenue, adsSpend, roasAds } = useMemo(() => {
     const totalRevenue = rows.reduce((s, r) => s + r.revenue, 0);
     const organicRevenue = rows
@@ -36,13 +40,16 @@ export function MlVendasPanel({ rows, trafficAdsRows }: MlVendasPanelProps) {
       {/* Cabeçalho e Filtros */}
       <div className="px-8 pt-7 pb-4 flex flex-wrap items-center justify-between gap-3 border-b border-gray-200 bg-white shadow-sm">
         <div>
-          <h1 className="text-xl font-bold text-gray-900">Performance e ROAS - Mercado Livre</h1>
-          <p className="text-xs text-gray-400 mt-0.5">Painel de decisão rápida por campanha</p>
+          <h1 className="text-xl font-bold text-gray-900">Centro de Comando: CRO e Tráfego - Mercado Livre</h1>
+          <p className="text-xs text-gray-400 mt-0.5">Alertas prescritivos por anúncio: escalar, otimizar ou pausar</p>
         </div>
         <MlDateRangeFilter />
       </div>
 
       <div className="flex-1 overflow-auto px-8 py-6 space-y-6">
+
+        {/* Feed de Insights Acionáveis — o que fazer AGORA com cada anúncio */}
+        <ActionableInsightsFeed rows={croRows} />
 
         {/* Cards de Resumo */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
@@ -56,8 +63,11 @@ export function MlVendasPanel({ rows, trafficAdsRows }: MlVendasPanelProps) {
         {/* Gráfico */}
         <MlPerformanceChart rows={rows} />
 
-        {/* Tabela de Decisão */}
-        <MlPerformanceTable rows={rows} />
+        {/* Smart Matrix — tabela de decisão ordenável com ação sugerida por linha */}
+        <div>
+          <h2 className="text-sm font-semibold text-gray-700 mb-2">Smart Matrix (CRO e Tráfego)</h2>
+          <SmartMatrixTable rows={croRows} />
+        </div>
 
         {/* Ingestão via webhook n8n (traffic_performance_ads) */}
         <div>

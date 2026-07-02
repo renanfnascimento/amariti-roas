@@ -47,6 +47,10 @@ export interface MlPerformanceRow {
   revenue:        number;
   orders_count:   number;
   traffic_source: MlTrafficSource;
+  // Métricas de funil para o Centro de Comando de CRO. Chegam 0 até o
+  // workflow do n8n passar a enviar prints/clicks por campanha.
+  impressions:    number;
+  clicks:         number;
 }
 
 // Agregado diário por fonte de tráfego, alimentado pelo webhook
@@ -60,6 +64,8 @@ export interface TrafficPerformanceAdsRow {
   ad_spend:       number;
   revenue:        number;
   orders_count:   number;
+  impressions:    number;
+  clicks:         number;
 }
 
 // ── Produto Analytics ─────────────────────────────────────────────────────────
