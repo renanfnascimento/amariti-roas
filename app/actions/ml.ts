@@ -12,7 +12,7 @@ export async function getMlPerformance(
 
   let query = supabase
     .from('ml_performance_roas')
-    .select('id, date, campaign_name, ad_spend, revenue, orders_count')
+    .select('id, date, campaign_name, ad_spend, revenue, orders_count, traffic_source')
     .order('date', { ascending: false });
 
   if (dateFrom) query = query.gte('date', dateFrom);

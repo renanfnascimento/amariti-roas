@@ -78,8 +78,8 @@ export function MlVendasPageSkeleton() {
       <div className="px-8 py-6 space-y-6">
 
         {/* Cards de resumo */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-          {Array.from({ length: 3 }).map((_, i) => (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+          {Array.from({ length: 5 }).map((_, i) => (
             <div key={i} className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm space-y-2">
               <div className="h-2 w-24 rounded bg-gray-200" />
               <div className="h-7 w-32 rounded bg-gray-200" />

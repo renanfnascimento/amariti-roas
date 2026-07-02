@@ -37,13 +37,16 @@ export interface ShopeeMetricsRow {
 
 // ── Mercado Livre: Performance e ROAS ─────────────────────────────────────────
 
+export type MlTrafficSource = 'ads' | 'organic';
+
 export interface MlPerformanceRow {
-  id:            string;
-  date:          string;
-  campaign_name: string;
-  ad_spend:      number;
-  revenue:       number;
-  orders_count:  number;
+  id:             string;
+  date:           string;
+  campaign_name:  string;
+  ad_spend:       number;
+  revenue:        number;
+  orders_count:   number;
+  traffic_source: MlTrafficSource;
 }
 
 // ── Produto Analytics ─────────────────────────────────────────────────────────

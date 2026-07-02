@@ -55,6 +55,7 @@ export function MlPerformanceTable({ rows }: MlPerformanceTableProps) {
           </thead>
           <tbody className="divide-y divide-gray-100">
             {rows.map((row) => {
+              const isOrganic = row.traffic_source === 'organic';
               const roas = row.ad_spend > 0 ? row.revenue / row.ad_spend : 0;
               return (
                 <tr key={row.id} className="hover:bg-gray-50 transition-colors">
@@ -64,10 +65,16 @@ export function MlPerformanceTable({ rows }: MlPerformanceTableProps) {
                   <td className="px-4 py-3 text-right text-gray-700">{fmt(row.revenue)}</td>
                   <td className="px-4 py-3 text-right text-gray-700">{row.orders_count}</td>
                   <td className="px-4 py-3 text-center font-semibold text-gray-900">
-                    {roas.toFixed(2)}x
+                    {isOrganic ? '—' : `${roas.toFixed(2)}x`}
                   </td>
                   <td className="px-4 py-3 text-center">
-                    <RoasStatusBadge roas={roas} />
+                    {isOrganic ? (
+                      <span className="inline-flex items-center rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-semibold text-gray-600">
+                        Orgânico
+                      </span>
+                    ) : (
+                      <RoasStatusBadge roas={roas} />
+                    )}
                   </td>
                   <td className="px-4 py-3 text-center">
                     <button

@@ -16,11 +16,16 @@ interface MlVendasPanelProps {
 }
 
 export function MlVendasPanel({ rows }: MlVendasPanelProps) {
-  const { totalAdSpend, totalRevenue, roasGlobal } = useMemo(() => {
-    const totalAdSpend = rows.reduce((s, r) => s + r.ad_spend, 0);
+  const { totalRevenue, organicRevenue, adsRevenue, adsSpend, roasAds } = useMemo(() => {
     const totalRevenue = rows.reduce((s, r) => s + r.revenue, 0);
-    const roasGlobal = totalAdSpend > 0 ? totalRevenue / totalAdSpend : 0;
-    return { totalAdSpend, totalRevenue, roasGlobal };
+    const organicRevenue = rows
+      .filter((r) => r.traffic_source === 'organic')
+      .reduce((s, r) => s + r.revenue, 0);
+    const adsRows = rows.filter((r) => r.traffic_source === 'ads');
+    const adsRevenue = adsRows.reduce((s, r) => s + r.revenue, 0);
+    const adsSpend = adsRows.reduce((s, r) => s + r.ad_spend, 0);
+    const roasAds = adsSpend > 0 ? adsRevenue / adsSpend : 0;
+    return { totalRevenue, organicRevenue, adsRevenue, adsSpend, roasAds };
   }, [rows]);
 
   return (
@@ -38,10 +43,12 @@ export function MlVendasPanel({ rows }: MlVendasPanelProps) {
       <div className="flex-1 overflow-auto px-8 py-6 space-y-6">
 
         {/* Cards de Resumo */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-          <KpiCard title="Investimento Total" value={fmtBRL(totalAdSpend)} />
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
           <KpiCard title="Faturamento Total" value={fmtBRL(totalRevenue)} />
-          <KpiCard title="ROAS Global" value={`${roasGlobal.toFixed(2)}x`} />
+          <KpiCard title="Faturamento Orgânico" value={fmtBRL(organicRevenue)} />
+          <KpiCard title="Faturamento Ads" value={fmtBRL(adsRevenue)} />
+          <KpiCard title="Investimento Mercado Ads" value={fmtBRL(adsSpend)} />
+          <KpiCard title="ROAS Geral Ads" value={`${roasAds.toFixed(2)}x`} />
         </div>
 
         {/* Gráfico */}
