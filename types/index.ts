@@ -49,6 +49,17 @@ export interface MlPerformanceRow {
   traffic_source: MlTrafficSource;
 }
 
+// Agregado diário por fonte de tráfego, alimentado pelo webhook
+// app/api/n8n/traffic-ads/route.ts (upsert em date + traffic_source).
+export interface TrafficPerformanceAdsRow {
+  id:             string;
+  date:           string;
+  traffic_source: MlTrafficSource;
+  ad_spend:       number;
+  revenue:        number;
+  orders_count:   number;
+}
+
 // ── Produto Analytics ─────────────────────────────────────────────────────────
 
 export interface ShopeeProductData {

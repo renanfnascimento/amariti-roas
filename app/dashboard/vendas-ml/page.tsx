@@ -5,7 +5,7 @@ import { Suspense } from 'react';
 import { DashboardLayout } from '@/components/DashboardLayout';
 import { MlVendasPanel } from '@/components/dashboard/MlVendasPanel';
 import { MlVendasPageSkeleton } from '@/components/dashboard/PageSkeletons';
-import { getMlPerformance } from '@/app/actions/ml';
+import { getMlPerformance, getTrafficPerformanceAds } from '@/app/actions/ml';
 
 interface PageProps {
   searchParams: Promise<{ from?: string; to?: string }>;
@@ -23,7 +23,10 @@ export default function VendasMlPage({ searchParams }: PageProps) {
 
 async function VendasMlContent({ searchParams }: PageProps) {
   const params = await searchParams;
-  const rows = await getMlPerformance(params.from, params.to);
+  const [rows, trafficAdsRows] = await Promise.all([
+    getMlPerformance(params.from, params.to),
+    getTrafficPerformanceAds(params.from, params.to),
+  ]);
 
-  return <MlVendasPanel rows={rows} />;
+  return <MlVendasPanel rows={rows} trafficAdsRows={trafficAdsRows} />;
 }

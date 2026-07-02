@@ -5,7 +5,8 @@ import { KpiCard } from '@/components/dashboard/KpiCard';
 import { MlDateRangeFilter } from '@/components/MlDateRangeFilter';
 import { MlPerformanceChart } from '@/components/dashboard/MlPerformanceChart';
 import { MlPerformanceTable } from '@/components/MlPerformanceTable';
-import { MlPerformanceRow } from '@/types';
+import { TrafficAdsPerformanceTable } from '@/components/TrafficAdsPerformanceTable';
+import { MlPerformanceRow, TrafficPerformanceAdsRow } from '@/types';
 
 function fmtBRL(v: number) {
   return v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -13,9 +14,10 @@ function fmtBRL(v: number) {
 
 interface MlVendasPanelProps {
   rows: MlPerformanceRow[];
+  trafficAdsRows: TrafficPerformanceAdsRow[];
 }
 
-export function MlVendasPanel({ rows }: MlVendasPanelProps) {
+export function MlVendasPanel({ rows, trafficAdsRows }: MlVendasPanelProps) {
   const { totalRevenue, organicRevenue, adsRevenue, adsSpend, roasAds } = useMemo(() => {
     const totalRevenue = rows.reduce((s, r) => s + r.revenue, 0);
     const organicRevenue = rows
@@ -56,6 +58,14 @@ export function MlVendasPanel({ rows }: MlVendasPanelProps) {
 
         {/* Tabela de Decisão */}
         <MlPerformanceTable rows={rows} />
+
+        {/* Ingestão via webhook n8n (traffic_performance_ads) */}
+        <div>
+          <h2 className="text-sm font-semibold text-gray-700 mb-2">
+            Performance por Dia e Canal (webhook n8n)
+          </h2>
+          <TrafficAdsPerformanceTable rows={trafficAdsRows} />
+        </div>
       </div>
     </div>
   );
