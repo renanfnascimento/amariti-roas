@@ -5,8 +5,10 @@ import { KpiCard } from '@/components/dashboard/KpiCard';
 import { MlDateRangeFilter } from '@/components/MlDateRangeFilter';
 import { MlPerformanceChart } from '@/components/dashboard/MlPerformanceChart';
 import { ActionableInsightsFeed } from '@/components/dashboard/ActionableInsightsFeed';
+import { CroPipelineBoard } from '@/components/dashboard/CroPipelineBoard';
 import { SmartMatrixTable } from '@/components/SmartMatrixTable';
 import { TrafficAdsPerformanceTable } from '@/components/TrafficAdsPerformanceTable';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { buildCroRows } from '@/lib/croRules';
 import { MlPerformanceRow, TrafficPerformanceAdsRow } from '@/types';
 
@@ -63,19 +65,32 @@ export function MlVendasPanel({ rows, trafficAdsRows }: MlVendasPanelProps) {
         {/* Gráfico */}
         <MlPerformanceChart rows={rows} />
 
-        {/* Smart Matrix — tabela de decisão ordenável com ação sugerida por linha */}
-        <div>
-          <h2 className="text-sm font-semibold text-gray-700 mb-2">Smart Matrix (CRO e Tráfego)</h2>
-          <SmartMatrixTable rows={croRows} />
-        </div>
+        {/* Duas visões do mesmo motor de CRO: Kanban de decisão e matriz ordenável */}
+        <Tabs defaultValue="pipeline">
+          <TabsList>
+            <TabsTrigger value="pipeline">Pipeline de CRO</TabsTrigger>
+            <TabsTrigger value="matrix">Smart Matrix</TabsTrigger>
+          </TabsList>
 
-        {/* Ingestão via webhook n8n (traffic_performance_ads) */}
-        <div>
-          <h2 className="text-sm font-semibold text-gray-700 mb-2">
-            Orgânico vs Ads (agregado diário via webhook n8n)
-          </h2>
-          <TrafficAdsPerformanceTable rows={trafficAdsRows} />
-        </div>
+          <TabsContent value="pipeline" className="mt-4">
+            <CroPipelineBoard rows={croRows} />
+          </TabsContent>
+
+          <TabsContent value="matrix" className="mt-4 space-y-6">
+            <div>
+              <h2 className="text-sm font-semibold text-gray-700 mb-2">Smart Matrix (CRO e Tráfego)</h2>
+              <SmartMatrixTable rows={croRows} />
+            </div>
+
+            {/* Ingestão via webhook n8n (traffic_performance_ads) */}
+            <div>
+              <h2 className="text-sm font-semibold text-gray-700 mb-2">
+                Orgânico vs Ads (agregado diário via webhook n8n)
+              </h2>
+              <TrafficAdsPerformanceTable rows={trafficAdsRows} />
+            </div>
+          </TabsContent>
+        </Tabs>
       </div>
     </div>
   );

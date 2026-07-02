@@ -37,6 +37,9 @@ export interface ShopeeMetricsRow {
 
 // ── Mercado Livre: Performance e ROAS ─────────────────────────────────────────
 
+// Multi-conta: cada linha de performance pertence a uma operação.
+export type AccountName = 'momento' | 'amariti' | 'global';
+
 export type MlTrafficSource = 'ads' | 'organic';
 
 export interface MlPerformanceRow {
@@ -54,6 +57,7 @@ export interface MlPerformanceRow {
   // workflow do n8n passar a enviar prints/clicks por campanha.
   impressions:    number;
   clicks:         number;
+  account_name:   AccountName;
 }
 
 // Agregado diário por fonte de tráfego, alimentado pelo webhook
@@ -69,6 +73,22 @@ export interface TrafficPerformanceAdsRow {
   orders_count:   number;
   impressions:    number;
   clicks:         number;
+  account_name:   AccountName;
+}
+
+// ── Shopee: Performance e ROAS (espelho da inteligência do ML) ────────────────
+
+export interface ShopeePerformanceRoasRow {
+  id:            string;
+  date:          string;
+  campaign_id:   number | null;
+  campaign_name: string;
+  ad_spend:      number;
+  revenue:       number;
+  orders_count:  number;
+  impressions:   number;
+  clicks:        number;
+  account_name:  AccountName;
 }
 
 // ── Produto Analytics ─────────────────────────────────────────────────────────

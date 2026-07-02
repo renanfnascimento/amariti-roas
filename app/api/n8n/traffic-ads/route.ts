@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabasePublic } from '@/lib/supabase';
-import { TrafficAdsSource } from '@/types';
+import { AccountName, TrafficAdsSource } from '@/types';
+
+const VALID_ACCOUNTS: AccountName[] = ['momento', 'amariti', 'global'];
 
 interface TrafficAdsPayload {
   date: string;
@@ -8,6 +10,8 @@ interface TrafficAdsPayload {
   ad_spend: number;
   revenue: number;
   orders_count: number;
+  // Conta da operação (multi-conta); ausente = 'momento' via default do banco.
+  account_name?: AccountName;
   // Opcionais: o Centro de Comando de CRO usa CTR (clicks/impressions);
   // o n8n deve passar a enviá-los (prints/clicks da API de Ads do ML).
   impressions?: number;
@@ -23,6 +27,7 @@ function isValidRow(row: unknown): row is TrafficAdsPayload {
     typeof r.ad_spend === 'number' &&
     typeof r.revenue === 'number' &&
     typeof r.orders_count === 'number' &&
+    (r.account_name === undefined || VALID_ACCOUNTS.includes(r.account_name as AccountName)) &&
     (r.impressions === undefined || typeof r.impressions === 'number') &&
     (r.clicks === undefined || typeof r.clicks === 'number')
   );
@@ -59,7 +64,10 @@ export async function POST(request: NextRequest) {
   const supabase = getSupabasePublic();
   const { data, error } = await supabase
     .from('traffic_performance_ads')
-    .upsert(rows, { onConflict: 'date,traffic_source' })
+    .upsert(
+      rows.map((row) => ({ ...row, account_name: row.account_name ?? 'momento' })),
+      { onConflict: 'date,traffic_source,account_name' }
+    )
     .select('id');
 
   if (error) {

@@ -1,28 +1,28 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabasePublic } from '@/lib/supabase';
-import { AccountName, MlTrafficSource } from '@/types';
+import { AccountName } from '@/types';
 
 const VALID_ACCOUNTS: AccountName[] = ['momento', 'amariti', 'global'];
 
-interface MlRoasPayload {
+// Espelho do webhook ml-roas para a Shopee: o n8n envia um array de campanhas
+// (1 linha por campanha por dia) e o upsert em (date, campaign_id, account_name)
+// garante que reprocessar o mesmo dia atualiza em vez de duplicar.
+interface ShopeeRoasPayload {
   date: string;
   campaign_name: string;
   ad_spend: number;
   revenue: number;
-  orders_count: number;
-  traffic_source?: MlTrafficSource;
-  // ID da campanha na API de Ads do ML — com date e account_name, forma a
+  // ID da campanha na API de Ads da Shopee — com date e account_name, forma a
   // chave de upsert.
   campaign_id?: number;
   // Conta da operação (multi-conta); ausente = 'momento' via default do banco.
   account_name?: AccountName;
-  // Opcionais: alimentam o CTR do Centro de Comando de CRO (prints/clicks
-  // por campanha na API de Ads do ML).
+  orders_count?: number;
   impressions?: number;
   clicks?: number;
 }
 
-function isValidRow(row: unknown): row is MlRoasPayload {
+function isValidRow(row: unknown): row is ShopeeRoasPayload {
   if (typeof row !== 'object' || row === null) return false;
   const r = row as Record<string, unknown>;
   return (
@@ -30,20 +30,12 @@ function isValidRow(row: unknown): row is MlRoasPayload {
     typeof r.campaign_name === 'string' &&
     typeof r.ad_spend === 'number' &&
     typeof r.revenue === 'number' &&
-    typeof r.orders_count === 'number' &&
-    (r.traffic_source === undefined || r.traffic_source === 'ads' || r.traffic_source === 'organic') &&
     (r.campaign_id === undefined || typeof r.campaign_id === 'number') &&
     (r.account_name === undefined || VALID_ACCOUNTS.includes(r.account_name as AccountName)) &&
+    (r.orders_count === undefined || typeof r.orders_count === 'number') &&
     (r.impressions === undefined || typeof r.impressions === 'number') &&
     (r.clicks === undefined || typeof r.clicks === 'number')
   );
-}
-
-// n8n envia campanhas de Mercado Ads (com ad_spend > 0) e o volume de vendas
-// orgânicas (ad_spend = 0) no mesmo lote. Quando traffic_source não vem
-// explícito no payload, infere a partir do investimento.
-function resolveTrafficSource(row: MlRoasPayload): MlTrafficSource {
-  return row.traffic_source ?? (row.ad_spend === 0 ? 'organic' : 'ads');
 }
 
 export async function POST(request: NextRequest) {
@@ -63,36 +55,38 @@ export async function POST(request: NextRequest) {
 
   if (!Array.isArray(body) || body.length === 0) {
     return NextResponse.json(
-      { error: 'Corpo deve ser um array não vazio de registros' },
+      { error: 'Corpo deve ser um array não vazio de campanhas' },
       { status: 400 }
     );
   }
 
-  const rows = body.filter(isValidRow).map((row) => ({
-    ...row,
-    traffic_source: resolveTrafficSource(row),
-  }));
+  const rows = body.filter(isValidRow);
   if (rows.length === 0) {
     return NextResponse.json(
-      { error: 'Nenhum registro válido — esperado: date, campaign_name, ad_spend, revenue, orders_count' },
+      { error: 'Nenhum registro válido — esperado: date, campaign_name, ad_spend, revenue' },
       { status: 400 }
     );
   }
 
-  // Upsert em (date, campaign_id, account_name): reenvio do mesmo dia atualiza
-  // a linha da campanha em vez de duplicar. Linhas sem campaign_id (NULL)
-  // nunca colidem no Postgres, então entram como insert normal.
+  // Linhas sem campaign_id (NULL) nunca colidem no Postgres, então entram como
+  // insert normal — mesmo comportamento do ml-roas.
   const supabase = getSupabasePublic();
   const { data, error } = await supabase
-    .from('ml_performance_roas')
+    .from('shopee_performance_roas')
     .upsert(
-      rows.map((row) => ({ ...row, account_name: row.account_name ?? 'momento' })),
+      rows.map((row) => ({
+        ...row,
+        account_name: row.account_name ?? 'momento',
+        orders_count: row.orders_count ?? 0,
+        impressions:  row.impressions ?? 0,
+        clicks:       row.clicks ?? 0,
+      })),
       { onConflict: 'date,campaign_id,account_name' }
     )
     .select('id');
 
   if (error) {
-    console.error('[api/n8n/ml-roas]', error.message);
+    console.error('[api/n8n/shopee-roas]', error.message);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 

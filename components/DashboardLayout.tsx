@@ -5,6 +5,7 @@ import { usePathname } from 'next/navigation';
 import { useState } from 'react';
 import {
   LayoutDashboard,
+  Layers,
   ShoppingBag,
   ShoppingCart,
   Package,
@@ -122,6 +123,20 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
           >
             <LayoutDashboard className="h-4 w-4 flex-shrink-0" />
             Visão Geral
+          </Link>
+
+          {/* Hub Global — consolidado cross-canal e cross-conta */}
+          <Link
+            href="/dashboard/hub-global"
+            className={cn(
+              'flex items-center gap-2.5 rounded-md px-3 py-2 text-sm font-medium transition-colors mb-2',
+              pathname === '/dashboard/hub-global'
+                ? 'bg-gray-700 text-white'
+                : 'text-gray-400 hover:bg-gray-800 hover:text-white',
+            )}
+          >
+            <Layers className="h-4 w-4 flex-shrink-0" />
+            Hub Global
           </Link>
 
           <div className="border-t border-gray-800 mb-2" />

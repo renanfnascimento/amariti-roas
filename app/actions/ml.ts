@@ -12,7 +12,7 @@ export async function getMlPerformance(
 
   let query = supabase
     .from('ml_performance_roas')
-    .select('id, date, campaign_id, campaign_name, ad_spend, revenue, orders_count, traffic_source, impressions, clicks')
+    .select('id, date, campaign_id, campaign_name, ad_spend, revenue, orders_count, traffic_source, impressions, clicks, account_name')
     .order('date', { ascending: false });
 
   if (dateFrom) query = query.gte('date', dateFrom);
@@ -51,7 +51,7 @@ export async function getTrafficPerformanceAds(
 
   let query = supabase
     .from('traffic_performance_ads')
-    .select('id, date, traffic_source, ad_spend, revenue, orders_count, impressions, clicks')
+    .select('id, date, traffic_source, ad_spend, revenue, orders_count, impressions, clicks, account_name')
     .order('date', { ascending: false });
 
   if (dateFrom) query = query.gte('date', dateFrom);
