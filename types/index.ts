@@ -42,6 +42,9 @@ export type MlTrafficSource = 'ads' | 'organic';
 export interface MlPerformanceRow {
   id:             string;
   date:           string;
+  // ID da campanha na API de Ads do ML; NULL em linhas antigas/manuais.
+  // Com date, forma a chave de upsert da ingestão granular do n8n.
+  campaign_id:    number | null;
   campaign_name:  string;
   ad_spend:       number;
   revenue:        number;

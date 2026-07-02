@@ -9,6 +9,8 @@ interface MlRoasPayload {
   revenue: number;
   orders_count: number;
   traffic_source?: MlTrafficSource;
+  // ID da campanha na API de Ads do ML — com date, forma a chave de upsert.
+  campaign_id?: number;
   // Opcionais: alimentam o CTR do Centro de Comando de CRO (prints/clicks
   // por campanha na API de Ads do ML).
   impressions?: number;
@@ -25,6 +27,7 @@ function isValidRow(row: unknown): row is MlRoasPayload {
     typeof r.revenue === 'number' &&
     typeof r.orders_count === 'number' &&
     (r.traffic_source === undefined || r.traffic_source === 'ads' || r.traffic_source === 'organic') &&
+    (r.campaign_id === undefined || typeof r.campaign_id === 'number') &&
     (r.impressions === undefined || typeof r.impressions === 'number') &&
     (r.clicks === undefined || typeof r.clicks === 'number')
   );
@@ -70,13 +73,19 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  // Upsert em (date, campaign_id): reenvio do mesmo dia atualiza a linha da
+  // campanha em vez de duplicar. Linhas sem campaign_id (NULL) nunca colidem
+  // no Postgres, então entram como insert normal.
   const supabase = getSupabasePublic();
-  const { data, error } = await supabase.from('ml_performance_roas').insert(rows).select('id');
+  const { data, error } = await supabase
+    .from('ml_performance_roas')
+    .upsert(rows, { onConflict: 'date,campaign_id' })
+    .select('id');
 
   if (error) {
     console.error('[api/n8n/ml-roas]', error.message);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  return NextResponse.json({ inserted: data?.length ?? rows.length, skipped: body.length - rows.length });
+  return NextResponse.json({ upserted: data?.length ?? rows.length, skipped: body.length - rows.length });
 }

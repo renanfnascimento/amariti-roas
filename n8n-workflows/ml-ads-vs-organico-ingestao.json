@@ -116,13 +116,43 @@
     {
       "parameters": {
         "mode": "runOnceForAllItems",
-        "jsCode": "// Roda 1x/dia. Usa a data de execucao (UTC) para separar o total de vendas do dia\n// (orders/search) do que foi atribuido a Ads (product_ads/campaigns/search).\n// A API de pedidos do ML nao marca pedido individual como \"veio de ads\" -\n// por isso o organico e calculado por diferenca (total - atribuido a ads).\nconst today = new Date().toISOString().slice(0, 10);\n\nconst ordersResponse = $('Puxar Vendas Totais (ML)1').first().json;\nconst adsResponse = $('Puxar Custos de Ads (ML)1').first().json;\n\n// Total do dia (vendas pagas) vindo do orders/search\nconst paidOrders = (ordersResponse.results || []).filter(\n  (o) => o.date_created && o.date_created.slice(0, 10) === today && o.status === 'paid'\n);\nconst totalRevenue = paidOrders.reduce((sum, o) => sum + (o.paid_amount || 0), 0);\nconst totalOrders = paidOrders.length;\n\n// Metricas atribuidas a Ads vindo do product_ads/campaigns/search.\n// prints = impressoes; clicks = cliques. Alimentam o CTR do Centro de\n// Comando de CRO no dashboard (colunas impressions/clicks no Supabase).\nconst campaigns = adsResponse.results || [];\nlet adsSpend = 0;\nlet adsRevenue = 0;\nlet adsOrders = 0;\nlet adsImpressions = 0;\nlet adsClicks = 0;\n\nfor (const campaign of campaigns) {\n  const m = campaign.metrics || campaign.metrics_summary || {};\n  adsSpend += m.cost || 0;\n  adsRevenue += (m.direct_amount || 0) + (m.indirect_amount || 0);\n  adsOrders += (m.direct_items_quantity || 0) + (m.indirect_items_quantity || 0);\n  adsImpressions += m.prints || 0;\n  adsClicks += m.clicks || 0;\n}\n\n// Organico = total do dia menos o que ja foi atribuido a Ads.\n// Impressoes/cliques organicos nao existem nesta API -> ficam 0.\nconst organicRevenue = Math.max(totalRevenue - adsRevenue, 0);\nconst organicOrders = Math.max(totalOrders - adsOrders, 0);\n\nreturn [\n  {\n    json: {\n      date: today,\n      traffic_source: 'ml_organico',\n      ad_spend: 0,\n      revenue: Number(organicRevenue.toFixed(2)),\n      orders_count: organicOrders,\n      impressions: 0,\n      clicks: 0,\n    },\n  },\n  {\n    json: {\n      date: today,\n      traffic_source: 'ml_ads',\n      ad_spend: Number(adsSpend.toFixed(2)),\n      revenue: Number(adsRevenue.toFixed(2)),\n      orders_count: adsOrders,\n      impressions: adsImpressions,\n      clicks: adsClicks,\n    },\n  },\n];"
+        "jsCode": "// Roda 1x/dia. Gera DOIS payloads:\n//  - campaigns: 1 objeto POR CAMPANHA (granular) -> public.ml_performance_roas\n//  - aggregates: totais diarios ml_ads/ml_organico -> public.traffic_performance_ads\n// A API de pedidos do ML nao marca pedido individual como \"veio de ads\" -\n// por isso o organico e calculado por diferenca (total - atribuido a ads).\nconst today = new Date().toISOString().slice(0, 10);\n\nconst ordersResponse = $('Puxar Vendas Totais (ML)1').first().json;\nconst adsResponse = $('Puxar Custos de Ads (ML)1').first().json;\n\n// Total do dia (vendas pagas) vindo do orders/search\nconst paidOrders = (ordersResponse.results || []).filter(\n  (o) => o.date_created && o.date_created.slice(0, 10) === today && o.status === 'paid'\n);\nconst totalRevenue = paidOrders.reduce((sum, o) => sum + (o.paid_amount || 0), 0);\nconst totalOrders = paidOrders.length;\n\n// 1 objeto por campanha, somando os totais de Ads no caminho\nconst results = adsResponse.results || [];\nconst campaigns = [];\nlet adsSpend = 0;\nlet adsRevenue = 0;\nlet adsOrders = 0;\nlet adsImpressions = 0;\nlet adsClicks = 0;\n\nfor (const c of results) {\n  const m = c.metrics || {};\n  const spend = m.cost || 0;\n  const revenue = (m.direct_amount || 0) + (m.indirect_amount || 0);\n  const orders = (m.direct_items_quantity || 0) + (m.indirect_items_quantity || 0);\n  const prints = m.prints || 0;\n  const clicks = m.clicks || 0;\n\n  adsSpend += spend;\n  adsRevenue += revenue;\n  adsOrders += orders;\n  adsImpressions += prints;\n  adsClicks += clicks;\n\n  campaigns.push({\n    date: today,\n    campaign_id: c.id,\n    campaign_name: c.name || `Campanha ${c.id}`,\n    traffic_source: 'ads',\n    ad_spend: Number(spend.toFixed(2)),\n    revenue: Number(revenue.toFixed(2)),\n    orders_count: orders,\n    impressions: prints,\n    clicks: clicks,\n  });\n}\n\n// Organico = total do dia menos o que ja foi atribuido a Ads.\n// Impressoes/cliques organicos nao existem nesta API -> ficam 0.\nconst organicRevenue = Math.max(totalRevenue - adsRevenue, 0);\nconst organicOrders = Math.max(totalOrders - adsOrders, 0);\n\nconst aggregates = [\n  {\n    date: today,\n    traffic_source: 'ml_organico',\n    ad_spend: 0,\n    revenue: Number(organicRevenue.toFixed(2)),\n    orders_count: organicOrders,\n    impressions: 0,\n    clicks: 0,\n  },\n  {\n    date: today,\n    traffic_source: 'ml_ads',\n    ad_spend: Number(adsSpend.toFixed(2)),\n    revenue: Number(adsRevenue.toFixed(2)),\n    orders_count: adsOrders,\n    impressions: adsImpressions,\n    clicks: adsClicks,\n  },\n];\n\n// Item unico com os dois arrays: cada no HTTP seguinte envia o seu array\n// inteiro em um POST so (PostgREST aceita array = upsert em lote).\nreturn [{ json: { campaigns, aggregates } }];"
       },
       "id": "3e7c58c6-e814-4b6a-a3e7-108e06b57355",
-      "name": "Agregar Ads vs Organico1",
+      "name": "Montar Payloads Granular e Agregado1",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [1360, 160]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://dmccgehdvlmsvejgblqx.supabase.co/rest/v1/ml_performance_roas",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            { "name": "on_conflict", "value": "date,campaign_id" }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Prefer", "value": "resolution=merge-duplicates,return=minimal" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawBody": "={{ JSON.stringify($json.campaigns) }}",
+        "options": {}
+      },
+      "id": "8c5e2f7a-1b4d-4e9c-a3f6-7d2b9e5c1a48",
+      "name": "Upsert Campanhas (ml_performance_roas)1",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [1584, 60]
     },
     {
       "parameters": {
@@ -139,19 +169,20 @@
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "Prefer", "value": "resolution=merge-duplicates,return=minimal" }
+            { "name": "Prefer", "value": "resolution=merge-duplicates,return=minimal" },
+            { "name": "Content-Type", "value": "application/json" }
           ]
         },
         "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "={{ $json }}",
+        "contentType": "raw",
+        "rawBody": "={{ JSON.stringify($json.aggregates) }}",
         "options": {}
       },
       "id": "75e7a361-868a-4e89-b513-e608f2c49784",
-      "name": "Enviar para Supabase (traffic-ads)1",
+      "name": "Upsert Agregados (traffic_performance_ads)1",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.1,
-      "position": [1584, 160]
+      "position": [1584, 260]
     }
   ],
   "connections": {
@@ -176,10 +207,15 @@
       "main": [[{ "node": "Aguardar Vendas e Ads1", "type": "main", "index": 1 }]]
     },
     "Aguardar Vendas e Ads1": {
-      "main": [[{ "node": "Agregar Ads vs Organico1", "type": "main", "index": 0 }]]
+      "main": [[{ "node": "Montar Payloads Granular e Agregado1", "type": "main", "index": 0 }]]
     },
-    "Agregar Ads vs Organico1": {
-      "main": [[{ "node": "Enviar para Supabase (traffic-ads)1", "type": "main", "index": 0 }]]
+    "Montar Payloads Granular e Agregado1": {
+      "main": [
+        [
+          { "node": "Upsert Campanhas (ml_performance_roas)1", "type": "main", "index": 0 },
+          { "node": "Upsert Agregados (traffic_performance_ads)1", "type": "main", "index": 0 }
+        ]
+      ]
     }
   },
   "settings": {
