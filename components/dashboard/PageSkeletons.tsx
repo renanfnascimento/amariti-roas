@@ -87,6 +87,9 @@ export function MlVendasPageSkeleton() {
           ))}
         </div>
 
+        {/* Gráfico */}
+        <div className="rounded-xl border border-gray-200 bg-white shadow-sm h-72" />
+
         {/* Tabela */}
         <div className="rounded-lg border border-gray-200 bg-white shadow-sm overflow-hidden">
           <div className="h-11 bg-gray-50 border-b border-gray-200" />

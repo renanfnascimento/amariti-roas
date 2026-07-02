@@ -3,6 +3,7 @@
 import { useMemo } from 'react';
 import { KpiCard } from '@/components/dashboard/KpiCard';
 import { MlDateRangeFilter } from '@/components/MlDateRangeFilter';
+import { MlPerformanceChart } from '@/components/dashboard/MlPerformanceChart';
 import { MlPerformanceTable } from '@/components/MlPerformanceTable';
 import { MlPerformanceRow } from '@/types';
 
@@ -42,6 +43,9 @@ export function MlVendasPanel({ rows }: MlVendasPanelProps) {
           <KpiCard title="Faturamento Total" value={fmtBRL(totalRevenue)} />
           <KpiCard title="ROAS Global" value={`${roasGlobal.toFixed(2)}x`} />
         </div>
+
+        {/* Gráfico */}
+        <MlPerformanceChart rows={rows} />
 
         {/* Tabela de Decisão */}
         <MlPerformanceTable rows={rows} />

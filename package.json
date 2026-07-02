@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "seed:ml-roas": "node --env-file=env.local scripts/seed-ml-roas.ts"
   },
   "dependencies": {
     "@radix-ui/react-dialog": "^1.1.17",
