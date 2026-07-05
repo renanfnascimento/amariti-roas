@@ -4,8 +4,10 @@ import { getMarketCompetitors } from '@/app/actions/mercado';
 
 export const metadata = { title: 'Concorrência da página · Amariti ROAS' };
 
-// Dados chegam via webhook do n8n — revalida a cada 30s como as demais páginas.
-export const revalidate = 30;
+// Dados chegam via webhook do n8n — renderização em tempo real, sem cache do
+// App Router, para a vitrine refletir o Supabase imediatamente após a ingestão.
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 
 export default async function ConcorrenciaPage() {
   const competitors = await getMarketCompetitors();

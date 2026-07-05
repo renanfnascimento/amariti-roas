@@ -5,11 +5,13 @@ interface MarketCompetitorPayload {
   ml_item_id: string;
   title: string;
   price: number | string;
-  thumbnail_url?: string;
+  // Opcionais toleram null explícito além de ausência — mapeamentos no n8n
+  // costumam produzir null para campos que a Search API omite.
+  thumbnail_url?: string | null;
   // A API do ML ora devolve número exato, ora faixa em string ("500+") —
   // aceita ambos e normaliza para inteiro no banco.
-  sold_quantity?: number | string;
-  permalink?: string;
+  sold_quantity?: number | string | null;
+  permalink?: string | null;
 }
 
 function isValidRow(row: unknown): row is MarketCompetitorPayload {
@@ -19,14 +21,15 @@ function isValidRow(row: unknown): row is MarketCompetitorPayload {
     typeof r.ml_item_id === 'string' && r.ml_item_id.length > 0 &&
     typeof r.title === 'string' && r.title.length > 0 &&
     (typeof r.price === 'number' || (typeof r.price === 'string' && !Number.isNaN(Number(r.price)))) &&
-    (r.thumbnail_url === undefined || typeof r.thumbnail_url === 'string') &&
-    (r.sold_quantity === undefined || typeof r.sold_quantity === 'number' || typeof r.sold_quantity === 'string') &&
-    (r.permalink === undefined || typeof r.permalink === 'string')
+    (r.thumbnail_url === undefined || r.thumbnail_url === null || typeof r.thumbnail_url === 'string') &&
+    (r.sold_quantity === undefined || r.sold_quantity === null ||
+      typeof r.sold_quantity === 'number' || typeof r.sold_quantity === 'string') &&
+    (r.permalink === undefined || r.permalink === null || typeof r.permalink === 'string')
   );
 }
 
-function parseSoldQuantity(value: number | string | undefined): number {
-  if (value === undefined) return 0;
+function parseSoldQuantity(value: number | string | null | undefined): number {
+  if (value === undefined || value === null) return 0;
   if (typeof value === 'number') return Math.max(0, Math.trunc(value));
   // Faixas como "500+" ou "mais de 500" viram o número contido na string.
   const digits = value.replace(/\D/g, '');
