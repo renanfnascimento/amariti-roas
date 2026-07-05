@@ -1,12 +1,27 @@
-import { MercadoPlaceholder } from '@/components/mercado/MercadoPlaceholder';
+import { DashboardLayout } from '@/components/DashboardLayout';
+import { CompetitorsGrid } from '@/components/mercado/CompetitorsGrid';
+import { getMarketCompetitors } from '@/app/actions/mercado';
 
 export const metadata = { title: 'Concorrência da página · Amariti ROAS' };
 
-export default function ConcorrenciaPage() {
+// Dados chegam via webhook do n8n — revalida a cada 30s como as demais páginas.
+export const revalidate = 30;
+
+export default async function ConcorrenciaPage() {
+  const competitors = await getMarketCompetitors();
+
   return (
-    <MercadoPlaceholder
-      title="Concorrência da página"
-      description="Monitoramento dos concorrentes diretos dos seus anúncios: preço, reputação, frete e posicionamento."
-    />
+    <DashboardLayout>
+      <div className="p-8 max-w-7xl mx-auto">
+        <h1 className="text-2xl font-bold tracking-tight text-gray-900">Concorrência da página</h1>
+        <p className="mt-1 text-sm text-gray-500">
+          Monitoramento dos concorrentes diretos dos seus anúncios no Mercado Livre: preço, volume de vendas e posicionamento.
+        </p>
+
+        <div className="mt-8">
+          <CompetitorsGrid competitors={competitors} />
+        </div>
+      </div>
+    </DashboardLayout>
   );
 }

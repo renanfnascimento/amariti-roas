@@ -91,6 +91,22 @@ export interface ShopeePerformanceRoasRow {
   account_name:  AccountName;
 }
 
+// ── Mercado: Concorrência da página ───────────────────────────────────────────
+
+// Concorrente monitorado no Mercado Livre, alimentado pelo webhook
+// app/api/n8n/mercado-concorrencia/route.ts (upsert em ml_item_id).
+export interface MarketCompetitor {
+  id:            string;
+  ml_item_id:    string;
+  title:         string;
+  price:         number;
+  thumbnail_url: string | null;
+  sold_quantity: number;
+  permalink:     string | null;
+  created_at:    string;
+  updated_at:    string;
+}
+
 // ── Produto Analytics ─────────────────────────────────────────────────────────
 
 export interface ShopeeProductData {
