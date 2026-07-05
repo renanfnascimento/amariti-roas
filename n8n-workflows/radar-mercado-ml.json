@@ -1,0 +1,213 @@
+{
+  "name": "Radar de Mercado - Ingestão de Concorrentes ML",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "days",
+              "daysInterval": 1,
+              "triggerAtHour": 3,
+              "triggerAtMinute": 30
+            }
+          ]
+        }
+      },
+      "id": "1e3f5a16-dba9-4f92-833c-45e1333ec49c",
+      "name": "Gatilho Diário (03:30)",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        -1280,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// ==========================================\n// TERMOS DE BUSCA ESTRATÉGICOS DA OPERAÇÃO\n// ==========================================\n// Edite esta lista para mudar o alvo do radar. Cada termo vira uma busca\n// pública no Mercado Livre e os 20 primeiros resultados entram na vitrine\n// de concorrência do app (upsert — reprocessar não duplica).\nconst TERMOS = [\n  'calça jogger crepe',\n  'vestido feminino recortes',\n  'conjunto alfaiataria feminino',\n];\n\nreturn TERMOS.map(query => ({ json: { query } }));"
+      },
+      "id": "cf9cf3ef-7d39-415d-a298-2c689791d6e0",
+      "name": "Termos de Busca",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1056,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "batchSize": 1,
+        "options": {}
+      },
+      "id": "1e011bb3-30ef-4014-8c25-2664cf748c2d",
+      "name": "Loop por Termo",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        -832,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://api.mercadolibre.com/sites/MLB/search",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "q",
+              "value": "={{ $json.query }}"
+            },
+            {
+              "name": "limit",
+              "value": "20"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "fc99dab6-cc84-415e-9fde-4d02152c7a12",
+      "name": "Buscar no ML (Search API)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [
+        -576,
+        -16
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "// ==========================================\n// MAPEAMENTO: Search API do ML → contrato do webhook do app\n// ==========================================\n// O webhook /api/n8n/mercado-concorrencia valida cada linha e faz upsert em\n// ml_item_id. ATENÇÃO ao contrato: campos opcionais ausentes devem ser\n// OMITIDOS (enviar null reprova a linha na validação do app).\nconst resposta = $input.first().json;\nconst results = Array.isArray(resposta.results) ? resposta.results : [];\n\nconst competitors = results\n  .filter(r => r && r.id && r.title)\n  .map(r => {\n    const item = {\n      ml_item_id: String(r.id),\n      title: String(r.title),\n      price: Number(r.price) || 0,\n      // A Search API pública às vezes omite sold_quantity — 0 sinaliza 'sem dado'.\n      sold_quantity: Number(r.sold_quantity) || 0,\n    };\n    if (r.thumbnail) item.thumbnail_url = String(r.thumbnail);\n    if (r.permalink) item.permalink = String(r.permalink);\n    return item;\n  });\n\n// Sempre retorna exatamente 1 item — mesmo com busca vazia ou erro da API —\n// para o Split In Batches nunca encerrar o loop antes de varrer todos os termos.\nreturn [{\n  json: {\n    termo: resposta.query || null,\n    total: competitors.length,\n    competitors,\n  },\n}];"
+      },
+      "id": "18722cd6-4ce8-4c1a-99c0-b1106fe8adfb",
+      "name": "Mapear Concorrentes",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -352,
+        -16
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://SEU-DOMINIO.vercel.app/api/n8n/mercado-concorrencia",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-api-key",
+              "value": "COLE_AQUI_O_N8N_WEBHOOK_SECRET"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ JSON.stringify($json.competitors) }}",
+        "options": {}
+      },
+      "id": "7a8dfda3-5cbc-4ede-bea6-74e1777f2dd7",
+      "name": "Enviar para o App",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [
+        -128,
+        -16
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {},
+      "id": "e5f51ccd-61fc-47f6-8cbb-a1cbec16c736",
+      "name": "Radar Concluído",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        -576,
+        176
+      ]
+    }
+  ],
+  "connections": {
+    "Gatilho Diário (03:30)": {
+      "main": [
+        [
+          {
+            "node": "Termos de Busca",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Termos de Busca": {
+      "main": [
+        [
+          {
+            "node": "Loop por Termo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop por Termo": {
+      "main": [
+        [
+          {
+            "node": "Radar Concluído",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Buscar no ML (Search API)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Buscar no ML (Search API)": {
+      "main": [
+        [
+          {
+            "node": "Mapear Concorrentes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mapear Concorrentes": {
+      "main": [
+        [
+          {
+            "node": "Enviar para o App",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Enviar para o App": {
+      "main": [
+        [
+          {
+            "node": "Loop por Termo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}
