@@ -25,7 +25,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// ==========================================\n// TERMOS DE BUSCA ESTRATÉGICOS DA OPERAÇÃO\n// ==========================================\n// Edite esta lista para mudar o alvo do radar. Cada termo vira uma busca\n// pública no Mercado Livre e os 20 primeiros resultados entram na vitrine\n// de concorrência do app (upsert — reprocessar não duplica).\nconst TERMOS = [\n  'calça jogger crepe',\n  'vestido feminino recortes',\n  'conjunto alfaiataria feminino',\n];\n\nreturn TERMOS.map(query => ({ json: { query } }));"
+        "jsCode": "// ==========================================\n// TERMOS DE BUSCA ESTRATÉGICOS DA OPERAÇÃO\n// ==========================================\n// Edite esta lista para mudar o alvo do radar. Cada termo vira uma busca\n// na Search API do ML (autenticada via OAuth2 — o endpoint devolve 403 sem\n// token desde 2024) e os 20 primeiros resultados entram na vitrine de\n// concorrência do app (upsert — reprocessar não duplica).\nconst TERMOS = [\n  'calça jogger crepe',\n  'vestido feminino recortes',\n  'conjunto alfaiataria feminino',\n];\n\nreturn TERMOS.map(query => ({ json: { query } }));"
       },
       "id": "cf9cf3ef-7d39-415d-a298-2c689791d6e0",
       "name": "Termos de Busca",
@@ -53,6 +53,8 @@
     {
       "parameters": {
         "url": "https://api.mercadolibre.com/sites/MLB/search",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "oAuth2Api",
         "sendQuery": true,
         "queryParameters": {
           "parameters": [
