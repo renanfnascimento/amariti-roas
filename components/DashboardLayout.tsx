@@ -16,6 +16,11 @@ import {
   Globe,
   Plug,
   BarChart2,
+  ScanSearch,
+  ChartLine,
+  Tags,
+  Swords,
+  Trophy,
   ChevronDown,
   ChevronRight,
   type LucideIcon,
@@ -53,6 +58,17 @@ const NAV_GROUPS: NavGroup[] = [
     ],
   },
   {
+    id: 'mercado',
+    label: 'Mercado',
+    items: [
+      { href: '/dashboard/mercado/analise-pagina', label: 'Análise da página',          icon: ScanSearch },
+      { href: '/dashboard/mercado/visitas',        label: 'Gráfico de visitas',         icon: ChartLine  },
+      { href: '/dashboard/mercado/palavras-chave', label: 'Palavras-chave para título', icon: Tags       },
+      { href: '/dashboard/mercado/concorrencia',   label: 'Concorrência da página',     icon: Swords     },
+      { href: '/dashboard/mercado/ranqueamento',   label: 'Ranqueamento dos anúncios',  icon: Trophy     },
+    ],
+  },
+  {
     id: 'ads',
     label: 'Ads Gerenciados',
     items: [
@@ -80,7 +96,7 @@ interface DashboardLayoutProps {
 export function DashboardLayout({ children }: DashboardLayoutProps) {
   const pathname = usePathname();
   const [openGroups, setOpenGroups] = useState<Set<string>>(
-    new Set(['marketplaces', 'ads', 'externo']),
+    new Set(['marketplaces', 'mercado', 'ads', 'externo']),
   );
 
   function toggleGroup(id: string) {
