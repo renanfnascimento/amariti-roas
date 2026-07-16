@@ -4,11 +4,11 @@ import { Home, FolderOpen, CalendarDays, CloudUpload, Settings, PlusCircle, Vide
 export function AppSidebar() {
   const menuItems = [
     { icon: Home, label: 'Home', href: '/' },
-    { icon: FolderOpen, label: 'Meus Projetos', href: '/projetos' },
-    { icon: Video, label: 'Templates de Vídeo', href: '/templates' },
-    { icon: CloudUpload, label: 'Drive & Assets', href: '/assets' },
-    { icon: CalendarDays, label: 'Agendamentos', href: '/calendario' },
-    { icon: Settings, label: 'Configurações', href: '/configuracoes' },
+    { icon: FolderOpen, label: 'Meus Projetos', href: '/dashboard/projetos' },
+    { icon: Video, label: 'Templates de Vídeo', href: '/dashboard/templates' },
+    { icon: CloudUpload, label: 'Drive & Assets', href: '/dashboard/assets' },
+    { icon: CalendarDays, label: 'Agendamentos', href: '/dashboard/agendamentos' },
+    { icon: Settings, label: 'Configurações', href: '/dashboard/configuracoes' },
   ];
 
   return (
