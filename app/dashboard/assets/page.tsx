@@ -1,13 +1,236 @@
+"use client"
+
+import React, { useState, useRef, useEffect } from 'react'
 import { AppLayout } from '@/components/layout/AppLayout'
-import { CloudUpload } from 'lucide-react'
+import { Cloud, Folder, Video, Image as ImageIcon, MoreVertical, UploadCloud, CheckCircle2, X, AlertCircle, File } from 'lucide-react'
+
+// TYPES
+interface DriveFile {
+  id: string
+  name: string
+  mimeType: string
+  webViewLink: string
+  iconLink: string
+}
 
 export default function AssetsPage() {
+  const [isConnected, setIsConnected] = useState(false)
+  const [assets, setAssets] = useState<DriveFile[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  
+  const [toastMessage, setToastMessage] = useState<string | null>(null)
+  const [openDropdownId, setOpenDropdownId] = useState<string | null>(null)
+  const dropdownRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setOpenDropdownId(null)
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside)
+    return () => document.removeEventListener("mousedown", handleClickOutside)
+  }, [])
+
+  useEffect(() => {
+    async function fetchDriveFiles() {
+      try {
+        setIsLoading(true)
+        setError(null)
+        const res = await fetch('/api/drive')
+        const data = await res.json()
+        
+        if (!res.ok) {
+          throw new Error(data.error || 'Falha ao buscar arquivos do Drive')
+        }
+        
+        setAssets(data.files)
+        setIsConnected(true) // If it fetched, it's connected
+      } catch (err: any) {
+        console.error(err)
+        setError(err.message)
+        setIsConnected(false)
+      } finally {
+        setIsLoading(false)
+      }
+    }
+
+    fetchDriveFiles()
+  }, [])
+
+  const handleSendToKanban = (assetName: string) => {
+    setOpenDropdownId(null)
+    setToastMessage(`Arquivo "${assetName}" enviado para a fila de produção`)
+    setTimeout(() => {
+      setToastMessage(null)
+    }, 3000)
+  }
+
+  const renderIcon = (mimeType: string, iconLink?: string) => {
+    if (mimeType.includes('folder')) return <Folder className="text-indigo-400" size={32} />
+    if (mimeType.includes('video')) return <Video className="text-pink-400" size={32} />
+    if (mimeType.includes('image')) return <ImageIcon className="text-emerald-400" size={32} />
+    
+    // Fallback using Google Drive provided icon if any, else generic file
+    return iconLink ? (
+      <img src={iconLink} alt="icon" className="w-8 h-8 opacity-80" />
+    ) : (
+      <File className="text-gray-400" size={32} />
+    )
+  }
+
   return (
     <AppLayout>
-      <div className="flex flex-col items-center justify-center h-[60vh] text-center">
-        <CloudUpload size={64} className="text-indigo-500/50 mb-4" />
-        <h1 className="text-3xl font-bold text-white mb-2">Drive & Assets</h1>
-        <p className="text-gray-400">Esta funcionalidade estará disponível em breve.</p>
+      <div className="flex flex-col h-full relative">
+        
+        {/* TOAST */}
+        {toastMessage && (
+          <div className="fixed bottom-6 right-6 z-50 flex items-center gap-3 bg-[#1e1e2d] border border-white/10 text-white px-4 py-3 rounded-lg shadow-xl animate-in slide-in-from-bottom-5">
+            <CheckCircle2 className="text-green-400" size={20} />
+            <p className="text-sm font-medium">{toastMessage}</p>
+            <button onClick={() => setToastMessage(null)} className="ml-4 text-gray-400 hover:text-white">
+              <X size={16} />
+            </button>
+          </div>
+        )}
+
+        {/* HEADER */}
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
+          <div>
+            <h1 className="text-3xl font-bold text-white tracking-tight">Central de Mídias & Drive</h1>
+            <p className="text-gray-400 mt-1">Gerencie seus arquivos, assets brutos e materiais de apoio.</p>
+          </div>
+          
+          <button 
+            disabled
+            className={`px-4 py-2.5 rounded-md flex items-center gap-2 font-medium transition-colors shadow-lg ${
+              isConnected 
+                ? 'bg-green-500/20 text-green-400 border border-green-500/30' 
+                : 'bg-indigo-600/50 text-white shadow-indigo-500/20 cursor-not-allowed opacity-50'
+            }`}
+          >
+            <Cloud size={18} />
+            {isConnected ? 'Google Drive Conectado' : 'Conectando ao Drive...'}
+          </button>
+        </div>
+
+        {/* ERROR ALERT */}
+        {error && (
+          <div className="mb-8 p-4 rounded-lg bg-red-500/10 border border-red-500/20 flex items-start gap-3">
+            <AlertCircle className="text-red-400 shrink-0 mt-0.5" size={20} />
+            <div>
+              <h4 className="text-red-400 font-medium">Erro de Integração</h4>
+              <p className="text-red-400/80 text-sm mt-1">{error}</p>
+            </div>
+          </div>
+        )}
+
+        {/* DROPZONE */}
+        <div className="w-full bg-black/20 border-2 border-dashed border-white/10 hover:border-indigo-500/50 hover:bg-indigo-500/5 transition-all rounded-xl p-12 flex flex-col items-center justify-center text-center cursor-pointer mb-8 group">
+          <div className="w-16 h-16 bg-white/5 rounded-full flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+            <UploadCloud size={32} className="text-indigo-400" />
+          </div>
+          <h3 className="text-lg font-semibold text-white mb-2">Arraste vídeos do CapCut ou fotos do Canva aqui</h3>
+          <p className="text-gray-400 text-sm max-w-md">
+            Solte os arquivos para subir diretamente no Drive da Amariti. Suporta .mp4, .png, .jpg e .zip
+          </p>
+        </div>
+
+        {/* ASSETS GRID */}
+        <div>
+          <h3 className="text-xl font-bold text-white mb-4">Arquivos da Pasta (Google Drive)</h3>
+          
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+            {/* SKELETON LOADER */}
+            {isLoading && Array.from({ length: 5 }).map((_, i) => (
+              <div key={i} className="glass-card p-4 rounded-xl flex flex-col animate-pulse">
+                <div className="w-12 h-12 bg-white/10 rounded-lg mb-4"></div>
+                <div className="h-4 bg-white/10 rounded w-3/4 mb-2"></div>
+                <div className="h-3 bg-white/5 rounded w-1/2 mt-2"></div>
+                <div className="w-full h-8 bg-white/5 rounded-md mt-4"></div>
+              </div>
+            ))}
+
+            {/* REAL FILES */}
+            {!isLoading && assets.map((asset) => (
+              <div key={asset.id} className="glass-card p-4 rounded-xl group hover:-translate-y-1 transition-all flex flex-col">
+                <div className="flex justify-between items-start mb-4">
+                  <div className="w-12 h-12 bg-white/5 rounded-lg flex items-center justify-center">
+                    {renderIcon(asset.mimeType, asset.iconLink)}
+                  </div>
+                  
+                  {/* DROPDOWN MENU SIMULATION */}
+                  <div className="relative">
+                    <button 
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        setOpenDropdownId(openDropdownId === asset.id ? null : asset.id)
+                      }}
+                      className="p-1.5 text-gray-400 hover:text-white bg-white/0 hover:bg-white/10 rounded-md transition-colors"
+                    >
+                      <MoreVertical size={16} />
+                    </button>
+                    
+                    {openDropdownId === asset.id && (
+                      <div 
+                        ref={dropdownRef}
+                        className="absolute right-0 top-8 z-50 min-w-[12rem] overflow-hidden rounded-md border border-white/10 bg-[#1e1e2d] p-1 text-white shadow-xl animate-in fade-in-0 zoom-in-95"
+                      >
+                        <button 
+                          className="w-full text-left px-2 py-1.5 text-sm hover:bg-white/10 rounded-sm outline-none"
+                          onClick={() => {
+                            setOpenDropdownId(null)
+                            window.open(asset.webViewLink, '_blank')
+                          }}
+                        >
+                          Visualizar no Drive
+                        </button>
+                        <button 
+                          className="w-full text-left px-2 py-1.5 text-sm hover:bg-white/10 rounded-sm outline-none"
+                          onClick={() => setOpenDropdownId(null)}
+                        >
+                          Mover para Projeto
+                        </button>
+                        <div className="h-px bg-white/10 my-1 mx-1" />
+                        <button 
+                          className="w-full text-left px-2 py-1.5 text-sm text-red-400 hover:bg-red-500/20 rounded-sm outline-none"
+                          onClick={() => setOpenDropdownId(null)}
+                        >
+                          Excluir
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <div className="flex-1">
+                  <h4 className="text-white font-medium text-sm line-clamp-2 leading-tight mb-1 group-hover:text-indigo-300 transition-colors" title={asset.name}>
+                    {asset.name}
+                  </h4>
+                  <div className="flex items-center justify-between text-xs text-gray-500 mt-2">
+                    <span className="truncate pr-2">{asset.mimeType.split('/').pop()}</span>
+                  </div>
+                </div>
+
+                {/* SEND TO KANBAN BUTTON */}
+                <button 
+                  onClick={() => handleSendToKanban(asset.name)}
+                  className="w-full mt-4 bg-white/5 hover:bg-white/10 border border-white/5 text-xs text-white font-medium py-2 rounded-md transition-colors"
+                >
+                  Enviar para Kanban
+                </button>
+              </div>
+            ))}
+
+            {!isLoading && !error && assets.length === 0 && (
+              <div className="col-span-full py-12 text-center border-2 border-dashed border-white/5 rounded-xl">
+                <p className="text-gray-400">Nenhum arquivo encontrado nesta pasta.</p>
+              </div>
+            )}
+          </div>
+        </div>
+
       </div>
     </AppLayout>
   )
