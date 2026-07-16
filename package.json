@@ -1,13 +1,12 @@
 {
-  "name": "amariti-roas",
+  "name": "contenthub-pro",
   "version": "0.1.0",
   "private": true,
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint",
-    "seed:ml-roas": "node --env-file=.env.local scripts/seed-ml-roas.ts"
+    "lint": "eslint"
   },
   "dependencies": {
     "@radix-ui/react-dialog": "^1.1.17",
