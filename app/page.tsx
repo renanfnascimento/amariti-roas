@@ -1,5 +1,5 @@
 import { AppLayout } from '@/components/layout/AppLayout';
-import { Play, MoreHorizontal, Instagram, Facebook, Youtube, Share2 } from 'lucide-react';
+import { Play, MoreHorizontal, Share2, Camera, Tv, Smartphone, PlusCircle } from 'lucide-react';
 
 const projects = [
   {
@@ -8,7 +8,7 @@ const projects = [
     source: 'Canva Pro',
     status: 'Pronto para Postar',
     thumbnail: 'https://images.unsplash.com/photo-1611162617474-5b21e879e113?q=80&w=400&auto=format&fit=crop',
-    platforms: [Instagram, Facebook],
+    platforms: [Camera, Tv],
     date: 'Hoje, 14:30',
   },
   {
@@ -16,8 +16,7 @@ const projects = [
     title: 'Tutorial de Uso - Produto X',
     source: 'CapCut',
     status: 'Em Edição',
-    thumbnail: 'https://images.unsplash.com/photo-1526948128573-703ee1aeb6fa?q=80&w=400&auto=format&fit=crop',
-    platforms: [Youtube, Instagram],
+    platforms: [Tv, Camera],
     date: 'Ontem',
   },
   {
@@ -25,8 +24,7 @@ const projects = [
     title: 'Teaser Lançamento Veo3',
     source: 'Veo3',
     status: 'Agendado',
-    thumbnail: 'https://images.unsplash.com/photo-1550745165-9bc0b252726f?q=80&w=400&auto=format&fit=crop',
-    platforms: [Instagram],
+    platforms: [Camera],
     date: '18 Jul, 09:00',
   }
 ];
