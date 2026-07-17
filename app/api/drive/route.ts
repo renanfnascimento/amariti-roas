@@ -27,7 +27,7 @@ export async function GET() {
 
     const response = await drive.files.list({
       q: `'${FOLDER_ID}' in parents and trashed = false`,
-      fields: 'files(id, name, mimeType, webViewLink, iconLink)',
+      fields: 'files(id, name, mimeType, webViewLink, iconLink, thumbnailLink)',
       orderBy: 'modifiedTime desc',
     });
 

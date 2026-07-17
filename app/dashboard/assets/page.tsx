@@ -11,6 +11,7 @@ interface DriveFile {
   mimeType: string
   webViewLink: string
   iconLink: string
+  thumbnailLink?: string
 }
 
 export default function AssetsPage() {
@@ -154,20 +155,23 @@ export default function AssetsPage() {
 
             {/* REAL FILES */}
             {!isLoading && assets.map((asset) => (
-              <div key={asset.id} className="glass-card p-4 rounded-xl group hover:-translate-y-1 transition-all flex flex-col">
-                <div className="flex justify-between items-start mb-4">
-                  <div className="w-12 h-12 bg-white/5 rounded-lg flex items-center justify-center">
-                    {renderIcon(asset.mimeType, asset.iconLink)}
-                  </div>
+              <div key={asset.id} className="glass-card rounded-xl group hover:-translate-y-1 transition-all flex flex-col overflow-hidden">
+                {/* Visual Header / Cover */}
+                <div className="h-32 bg-black/40 relative flex items-center justify-center overflow-hidden border-b border-white/5">
+                  {asset.thumbnailLink ? (
+                    <img src={asset.thumbnailLink} alt={asset.name} className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity" />
+                  ) : (
+                    renderIcon(asset.mimeType, asset.iconLink)
+                  )}
                   
                   {/* DROPDOWN MENU SIMULATION */}
-                  <div className="relative">
+                  <div className="absolute top-2 right-2 z-10">
                     <button 
                       onClick={(e) => {
                         e.stopPropagation()
                         setOpenDropdownId(openDropdownId === asset.id ? null : asset.id)
                       }}
-                      className="p-1.5 text-gray-400 hover:text-white bg-white/0 hover:bg-white/10 rounded-md transition-colors"
+                      className="p-1.5 text-gray-300 hover:text-white bg-black/50 hover:bg-black/80 rounded-md transition-colors backdrop-blur-sm"
                     >
                       <MoreVertical size={16} />
                     </button>
@@ -204,22 +208,22 @@ export default function AssetsPage() {
                   </div>
                 </div>
 
-                <div className="flex-1">
+                <div className="p-4 flex flex-col flex-1">
                   <h4 className="text-white font-medium text-sm line-clamp-2 leading-tight mb-1 group-hover:text-indigo-300 transition-colors" title={asset.name}>
                     {asset.name}
                   </h4>
-                  <div className="flex items-center justify-between text-xs text-gray-500 mt-2">
-                    <span className="truncate pr-2">{asset.mimeType.split('/').pop()}</span>
+                  <div className="flex items-center justify-between text-xs text-gray-500 mt-1">
+                    <span className="truncate">{asset.mimeType.split('/').pop()}</span>
                   </div>
-                </div>
 
-                {/* SEND TO KANBAN BUTTON */}
-                <button 
-                  onClick={() => handleSendToKanban(asset.name)}
-                  className="w-full mt-4 bg-white/5 hover:bg-white/10 border border-white/5 text-xs text-white font-medium py-2 rounded-md transition-colors"
-                >
-                  Enviar para Kanban
-                </button>
+                  {/* SEND TO KANBAN BUTTON */}
+                  <button 
+                    onClick={() => handleSendToKanban(asset.name)}
+                    className="w-full mt-4 bg-white/5 hover:bg-white/10 border border-white/5 text-xs text-white font-medium py-2 rounded-md transition-colors"
+                  >
+                    Enviar para Kanban
+                  </button>
+                </div>
               </div>
             ))}
 
