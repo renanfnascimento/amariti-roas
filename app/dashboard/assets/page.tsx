@@ -13,6 +13,7 @@ interface DriveFile {
   webViewLink: string
   iconLink: string
   thumbnailLink?: string
+  folderPath?: string
 }
 
 export default function AssetsPage() {
@@ -21,6 +22,7 @@ export default function AssetsPage() {
   const [photos, setPhotos] = useState<DriveFile[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [selectedCategory, setSelectedCategory] = useState<string>('Todas')
   
   const [toastMessage, setToastMessage] = useState<string | null>(null)
   const [openDropdownId, setOpenDropdownId] = useState<string | null>(null)
@@ -107,16 +109,21 @@ export default function AssetsPage() {
             )}
             
             {/* DROPDOWN MENU SIMULATION */}
-            <div className="absolute top-2 right-2 z-10">
-              <button 
-                onClick={(e) => {
-                  e.stopPropagation()
-                  setOpenDropdownId(openDropdownId === asset.id ? null : asset.id)
-                }}
-                className="p-1.5 text-gray-300 hover:text-white bg-black/50 hover:bg-black/80 rounded-md transition-colors backdrop-blur-sm"
-              >
-                <MoreVertical size={16} />
-              </button>
+          <div className="absolute top-2 right-2 z-10 flex flex-col gap-2 items-end">
+            <button 
+              onClick={(e) => {
+                e.stopPropagation()
+                setOpenDropdownId(openDropdownId === asset.id ? null : asset.id)
+              }}
+              className="p-1.5 text-gray-300 hover:text-white bg-black/50 hover:bg-black/80 rounded-md transition-colors backdrop-blur-sm"
+            >
+              <MoreVertical size={16} />
+            </button>
+            {asset.folderPath && asset.folderPath !== 'Raiz' && (
+              <span className="bg-indigo-500/80 backdrop-blur-sm text-[9px] uppercase tracking-wider text-white font-bold px-2 py-1 rounded-sm">
+                {asset.folderPath}
+              </span>
+            )}
               
               {openDropdownId === asset.id && (
                 <div 
@@ -243,7 +250,30 @@ export default function AssetsPage() {
               <h3 className="text-base font-semibold text-white mb-1">Arraste fotos de roupas aqui</h3>
               <p className="text-gray-400 text-xs">As fotos serão salvas diretamente na pasta Roupas do Drive.</p>
             </div>
-            {renderAssetGrid(photos, "Nenhuma foto de roupa encontrada na pasta.")}
+
+            {/* CATEGORY FILTERS */}
+            {!isLoading && photos.length > 0 && (
+              <div className="flex overflow-x-auto custom-scrollbar gap-2 pb-4 mb-4">
+                {['Todas', ...Array.from(new Set(photos.map(p => p.folderPath).filter(Boolean)))].map(cat => (
+                  <button
+                    key={cat as string}
+                    onClick={() => setSelectedCategory(cat as string)}
+                    className={`whitespace-nowrap px-4 py-2 rounded-full text-xs font-medium transition-all ${
+                      selectedCategory === cat 
+                        ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-500/20' 
+                        : 'bg-white/5 text-gray-400 border border-white/5 hover:text-white hover:bg-white/10'
+                    }`}
+                  >
+                    {cat}
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {renderAssetGrid(
+              selectedCategory === 'Todas' ? photos : photos.filter(p => p.folderPath === selectedCategory),
+              "Nenhuma foto de roupa encontrada na pasta."
+            )}
           </TabsContent>
 
           <TabsContent value="videos" className="space-y-4">
