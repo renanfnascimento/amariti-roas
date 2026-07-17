@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { Home, FolderOpen, CalendarDays, CloudUpload, Settings, PlusCircle, Video } from 'lucide-react';
+import { Home, FolderOpen, CalendarDays, CloudUpload, Settings, PlusCircle, Video, Scissors, Smartphone } from 'lucide-react';
 
 export function AppSidebar() {
   const menuItems = [
@@ -7,7 +7,9 @@ export function AppSidebar() {
     { icon: FolderOpen, label: 'Meus Projetos', href: '/dashboard/projetos' },
     { icon: Video, label: 'Templates de Vídeo', href: '/dashboard/templates' },
     { icon: CloudUpload, label: 'Drive & Assets', href: '/dashboard/assets' },
+    { icon: Scissors, label: 'Edição (Sem Marca)', href: '/dashboard/edicao' },
     { icon: CalendarDays, label: 'Agendamentos', href: '/dashboard/agendamentos' },
+    { icon: Smartphone, label: 'Calendário TikTok', href: '/dashboard/tiktok' },
     { icon: Settings, label: 'Configurações', href: '/dashboard/configuracoes' },
   ];
 
