@@ -5,7 +5,7 @@ import { AppLayout } from '@/components/layout/AppLayout'
 import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetTrigger } from '@/components/ui/sheet'
-import { Calendar as CalendarIcon, LayoutGrid, List, Plus, Edit2, Clock, MapPin, Search, ChevronLeft, ChevronRight, Video, Image as ImageIcon, MessageSquare, Wand2, CheckCircle2, AlertCircle } from 'lucide-react'
+import { Calendar as CalendarIcon, LayoutGrid, List, Plus, Edit2, Clock, MapPin, Search, ChevronLeft, ChevronRight, Video, Image as ImageIcon, MessageSquare, Wand2, CheckCircle2, AlertCircle, Copy, Check } from 'lucide-react'
 import { format, addDays, startOfMonth, endOfMonth, startOfWeek, endOfWeek, isSameMonth, isSameDay, subMonths, addMonths, parseISO } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 
@@ -18,6 +18,9 @@ interface ContentSlot {
   title: string
   platform: Platform
   status: Status
+  photos: string[]
+  prompt: string
+  category: string
 }
 
 interface DailyQuota {
@@ -35,6 +38,9 @@ const generateDailySlots = (completedCount: number): ContentSlot[] => {
   const slots: ContentSlot[] = []
   const platforms: Platform[] = ['TikTok Shop', 'Instagram', 'Facebook']
   let currentCompleted = 0
+  
+  // Exemplo de categorias do drive
+  const categories = ['saia', 'calça', 'blusa', 'vestido']
 
   platforms.forEach(platform => {
     for (let i = 1; i <= 4; i++) {
@@ -46,11 +52,21 @@ const generateDailySlots = (completedCount: number): ContentSlot[] => {
         status = 'Gerando no Veo3'
       }
 
+      const category = categories[Math.floor(Math.random() * categories.length)]
+
       slots.push({
         id: `${platform}-${i}`,
-        title: `Vídeo ${String(i).padStart(2, '0')} - Trend Produto`,
+        title: `Vídeo ${String(i).padStart(2, '0')}`,
         platform,
         status,
+        category,
+        photos: [
+          'https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?w=200&h=200&fit=crop',
+          'https://images.unsplash.com/photo-1525507119028-ed4c629a60a3?w=200&h=200&fit=crop',
+          'https://images.unsplash.com/photo-1550639525-c97d455acf70?w=200&h=200&fit=crop',
+          'https://images.unsplash.com/photo-1434389678369-182cb13012ff?w=200&h=200&fit=crop'
+        ],
+        prompt: `Crie um video usando a imagem da modelo da foto dizendo olha essa ${category} linda etc etc. lembrando que o veo3 gera videos de 10s`
       })
     }
   })
@@ -69,6 +85,14 @@ export default function AgendamentosPage() {
   const [quotas] = useState<DailyQuota[]>(mockQuotas)
   const [currentDate, setCurrentDate] = useState(today)
   const [selectedQuota, setSelectedQuota] = useState<DailyQuota | null>(null)
+  
+  const [copiedId, setCopiedId] = useState<string | null>(null)
+
+  const handleCopy = (text: string, id: string) => {
+    navigator.clipboard.writeText(text)
+    setCopiedId(id)
+    setTimeout(() => setCopiedId(null), 2000)
+  }
 
   const getStatusBadgeVariant = (status: Status) => {
     switch(status) {
@@ -111,12 +135,12 @@ export default function AgendamentosPage() {
         {/* HEADER & CONTROLS */}
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 shrink-0">
           <div>
-            <h1 className="text-3xl font-bold text-white tracking-tight">Calendário de Quotas (Alta Produção)</h1>
-            <p className="text-gray-400 mt-1">Gerencie a meta diária de 12 vídeos (TikTok, IG, FB) gerados por IA.</p>
+            <h1 className="text-3xl font-bold text-white tracking-tight">Calendário de Quotas (Veo 3)</h1>
+            <p className="text-gray-400 mt-1">Sua linha de montagem de 12 vídeos diários baseada em pastas de roupas.</p>
           </div>
           <button className="bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2.5 rounded-md flex items-center gap-2 font-medium transition-colors shadow-lg shadow-indigo-500/20">
             <Plus size={18} />
-            Agendar Massa
+            Gerar Quota do Dia (IA)
           </button>
         </div>
 
@@ -126,9 +150,6 @@ export default function AgendamentosPage() {
             <TabsList className="bg-white/5 border border-white/5">
               <TabsTrigger value="calendar" className="gap-2">
                 <CalendarIcon size={16} /> Visão Quotas
-              </TabsTrigger>
-              <TabsTrigger value="list" className="gap-2" disabled>
-                <List size={16} /> Visão Lista (Desativada)
               </TabsTrigger>
             </TabsList>
             
@@ -219,10 +240,10 @@ export default function AgendamentosPage() {
 
                     {/* DAILY PRODUCTION SHEET */}
                     {selectedQuota && (
-                      <SheetContent className="w-[400px] sm:w-[600px] flex flex-col border-l border-white/10 bg-[#151521]/95 backdrop-blur-xl p-0">
+                      <SheetContent className="w-[400px] sm:w-[680px] flex flex-col border-l border-white/10 bg-[#151521]/95 backdrop-blur-xl p-0">
                         <div className="p-6 border-b border-white/10 flex-shrink-0 bg-black/20">
                           <SheetHeader>
-                            <SheetTitle className="text-2xl text-white">Produção do Dia</SheetTitle>
+                            <SheetTitle className="text-2xl text-white">Linha de Produção (Veo 3)</SheetTitle>
                             <SheetDescription className="text-base text-gray-400 mt-1 flex items-center justify-between">
                               <span>{format(parseISO(selectedQuota.date), "EEEE, d 'de' MMMM", { locale: ptBR })}</span>
                               <span className="font-bold text-white px-3 py-1 bg-white/10 rounded-full">
@@ -232,37 +253,58 @@ export default function AgendamentosPage() {
                           </SheetHeader>
                         </div>
 
-                        <div className="flex-1 overflow-y-auto p-6 space-y-8 custom-scrollbar">
-                          {['TikTok Shop', 'Instagram', 'Facebook'].map(platform => {
-                            const platformSlots = selectedQuota.slots.filter(s => s.platform === platform)
-                            return (
-                              <div key={platform} className="space-y-3">
-                                <div className="flex items-center gap-2 pb-2 border-b border-white/10">
-                                  {getPlatformIcon(platform as Platform)}
-                                  <h3 className="font-semibold text-white">{platform}</h3>
-                                  <span className="text-xs text-gray-500 ml-auto">4 Slots</span>
+                        <div className="flex-1 overflow-y-auto p-6 space-y-6 custom-scrollbar">
+                          {selectedQuota.slots.map((slot, index) => (
+                            <div key={slot.id} className="glass-card p-4 rounded-xl flex flex-col gap-4 border border-white/10 hover:border-indigo-500/50 transition-colors">
+                              {/* Header do Slot */}
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-2">
+                                  <div className="w-6 h-6 rounded-full bg-indigo-500/20 text-indigo-400 flex items-center justify-center font-bold text-xs">
+                                    {index + 1}
+                                  </div>
+                                  <h3 className="font-semibold text-white flex items-center gap-2">
+                                    {getPlatformIcon(slot.platform)} {slot.platform}
+                                  </h3>
+                                  <span className="text-xs uppercase font-bold text-gray-500 px-2 py-0.5 bg-white/5 rounded">
+                                    {slot.category}
+                                  </span>
                                 </div>
-                                
-                                <div className="space-y-2">
-                                  {platformSlots.map(slot => (
-                                    <div key={slot.id} className="glass-card p-3 rounded-lg flex items-center justify-between group hover:border-indigo-500/30 transition-colors">
-                                      <div className="flex flex-col gap-1">
-                                        <span className="text-sm font-medium text-gray-200 group-hover:text-white transition-colors">{slot.title}</span>
-                                        <Badge variant={getStatusBadgeVariant(slot.status)} className="w-fit text-[10px] px-1.5 py-0">
-                                          {slot.status}
-                                        </Badge>
+                                <Badge variant={getStatusBadgeVariant(slot.status)} className="w-fit text-[10px] px-1.5 py-0">
+                                  {slot.status}
+                                </Badge>
+                              </div>
+                              
+                              {/* 4 Fotos Reserva */}
+                              <div>
+                                <span className="text-xs text-gray-400 font-medium mb-2 block">4 Fotos da Pasta (Backups)</span>
+                                <div className="grid grid-cols-4 gap-2">
+                                  {slot.photos.map((photoUrl, pIndex) => (
+                                    <div key={pIndex} className="relative aspect-square rounded-md overflow-hidden bg-black/50 border border-white/5 hover:border-indigo-400 transition-colors cursor-pointer group">
+                                      <img src={photoUrl} alt="Roupa" className="w-full h-full object-cover group-hover:scale-110 transition-transform" />
+                                      <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
+                                        <ImageIcon size={16} className="text-white" />
                                       </div>
-                                      
-                                      <button className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600/20 hover:bg-indigo-600 text-indigo-300 hover:text-white text-xs font-semibold rounded transition-all border border-indigo-500/30 hover:border-indigo-500">
-                                        <Wand2 size={12} />
-                                        Gerar Script Veo3
-                                      </button>
                                     </div>
                                   ))}
                                 </div>
                               </div>
-                            )
-                          })}
+
+                              {/* Prompt Dinâmico */}
+                              <div className="bg-black/40 rounded-lg p-3 relative group border border-white/5">
+                                <span className="text-xs text-gray-500 font-medium mb-1 block">Prompt para o Veo 3</span>
+                                <p className="text-sm text-gray-300 font-mono pr-12 leading-relaxed">
+                                  {slot.prompt}
+                                </p>
+                                <button 
+                                  onClick={() => handleCopy(slot.prompt, slot.id)}
+                                  className="absolute top-3 right-3 p-2 bg-indigo-600/20 hover:bg-indigo-600 text-indigo-300 hover:text-white rounded-md transition-all"
+                                  title="Copiar Prompt"
+                                >
+                                  {copiedId === slot.id ? <Check size={16} className="text-green-400" /> : <Copy size={16} />}
+                                </button>
+                              </div>
+                            </div>
+                          ))}
                         </div>
                       </SheetContent>
                     )}

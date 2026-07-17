@@ -1,10 +1,8 @@
 import { NextResponse } from 'next/server';
 
-// Rota de Cron Vercel - Chamada automaticamente todo dia
+// Rota de Cron Vercel - Chamada automaticamente todo dia (ex: 4:00 AM)
 export async function GET(request: Request) {
   try {
-    // 1. Simulação: Buscar todas as fotos da rota /api/drive
-    // Na Vercel, faremos um fetch absoluto usando process.env.NEXT_PUBLIC_APP_URL
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
     const driveRes = await fetch(`${baseUrl}/api/drive`);
     
@@ -14,36 +12,53 @@ export async function GET(request: Request) {
 
     const { photos } = await driveRes.json();
 
-    if (!photos || photos.length === 0) {
-      return NextResponse.json({ message: 'Nenhuma foto encontrada no estoque.' }, { status: 404 });
+    if (!photos || photos.length < 48) {
+      // Idealmente precisamos de 48 fotos para 12 vídeos (4 backups por vídeo)
+      return NextResponse.json({ 
+        message: `Estoque baixo. Foram encontradas apenas ${photos?.length || 0} fotos. Precisamos de pelo menos 48 para fechar as quotas.` 
+      }, { status: 400 });
     }
 
-    // 2. Selecionar uma foto aleatória do estoque
-    const randomIndex = Math.floor(Math.random() * photos.length);
-    const selectedPhoto = photos[randomIndex];
+    // 1. Ordenar por data de alteração (Mais recentes primeiro)
+    // O /api/drive já faz o orderBy: 'modifiedTime desc' na API do Google, 
+    // então a array `photos` já vem perfeitamente ordenada dos mais novos pros mais velhos.
 
-    // 3. Simulação: Chamada para IA de Animação (Runway, Luma, Kling, etc)
-    // const animationRes = await fetch('https://api.ia-de-video.com/animate', { ... })
-    const aiSimulatedResponse = {
-      status: 'success',
-      generatedVideoUrl: 'https://exemplo.com/video-animado.mp4',
-      script: 'Descubra a nova tendência que chegou na loja! Essa peça exclusiva é perfeita para o seu dia a dia.'
-    };
+    // 2. Pegar as 48 fotos mais recentes e separar em 12 blocos de 4 fotos
+    const dailyQuotaSlots = [];
+    let photoIndex = 0;
 
-    // 4. Inserir no Supabase (Kanban - Coluna: Captação/Gravação)
-    // await supabase.from('projetos').insert({
-    //   titulo: `TikTok Automático: ${selectedPhoto.name}`,
-    //   plataforma_foco: 'TikTok Shop',
-    //   status: 'Ideação & Roteiro',
-    //   asset_original: selectedPhoto.webViewLink,
-    //   script_gerado: aiSimulatedResponse.script
-    // })
+    for (let i = 1; i <= 12; i++) {
+      const slotPhotos = [
+        photos[photoIndex],
+        photos[photoIndex + 1],
+        photos[photoIndex + 2],
+        photos[photoIndex + 3]
+      ];
+      
+      // A categoria predominante (pegamos da primeira foto) para gerar o prompt
+      const category = slotPhotos[0].folderPath || 'roupa';
+
+      dailyQuotaSlots.push({
+        id: `video-${i}`,
+        title: `Vídeo ${String(i).padStart(2, '0')}`,
+        platform: i <= 4 ? 'TikTok Shop' : i <= 8 ? 'Instagram' : 'Facebook',
+        status: 'Gerando no Veo3',
+        category,
+        photos: slotPhotos.map(p => p.thumbnailLink || p.iconLink),
+        prompt: `Crie um video usando a imagem da modelo da foto dizendo olha essa ${category} linda etc etc. lembrando que o veo3 gera videos de 10s`
+      });
+
+      photoIndex += 4;
+    }
+
+    // 3. Salvar no Banco de Dados (Mock)
+    // Aqui nós inseriríamos no Supabase a quota do dia.
+    // await supabase.from('daily_quotas').insert({ date: 'hoje', slots: dailyQuotaSlots })
 
     return NextResponse.json({
-      message: 'Motor TikTok executado com sucesso!',
-      action: 'Projeto gerado e inserido no Kanban',
-      photo_selected: selectedPhoto.name,
-      folder: selectedPhoto.folderPath
+      message: 'Motor TikTok executado com sucesso às 4:00 AM!',
+      action: '12 vídeos separados com 4 backups cada e prompts prontos.',
+      quota_generated: dailyQuotaSlots
     });
 
   } catch (error: any) {
