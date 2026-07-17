@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server';
 import { google } from 'googleapis';
 
-const FOLDER_ID = '1J-blceVqi8m1gUmex-Y7WZN4HtYikqf4';
+const VIDEOS_FOLDER_ID = '1J-blceVqi8m1gUmex-Y7WZN4HtYikqf4';
+const PHOTOS_FOLDER_ID = '1sKOHgN8EUR0WQNUqUsXad-4jdPC5_8Iu';
 
 export async function GET() {
   try {
@@ -25,15 +26,21 @@ export async function GET() {
 
     const drive = google.drive({ version: 'v3', auth });
 
-    const response = await drive.files.list({
-      q: `'${FOLDER_ID}' in parents and trashed = false`,
-      fields: 'files(id, name, mimeType, webViewLink, iconLink, thumbnailLink)',
-      orderBy: 'modifiedTime desc',
-    });
+    const fetchFolder = async (folderId: string) => {
+      const res = await drive.files.list({
+        q: `'${folderId}' in parents and trashed = false`,
+        fields: 'files(id, name, mimeType, webViewLink, iconLink, thumbnailLink)',
+        orderBy: 'modifiedTime desc',
+      });
+      return res.data.files || [];
+    };
 
-    const files = response.data.files || [];
+    const [videos, photos] = await Promise.all([
+      fetchFolder(VIDEOS_FOLDER_ID),
+      fetchFolder(PHOTOS_FOLDER_ID)
+    ]);
 
-    return NextResponse.json({ files });
+    return NextResponse.json({ videos, photos });
   } catch (error: any) {
     console.error('Error fetching from Google Drive:', error);
     return NextResponse.json(
