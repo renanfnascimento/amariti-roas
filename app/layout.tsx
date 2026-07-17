@@ -7,6 +7,9 @@ const inter = Inter({ subsets: ['latin'], variable: '--font-inter' });
 export const metadata: Metadata = {
   title: 'ContentHub Pro',
   description: 'Seu estúdio centralizado de criação e postagem de vídeos',
+  other: {
+    'tiktok-developers-site-verification': 'MLi8eWys3B4XxMD1e9f7dOwQZOpRnuNy',
+  },
 };
 
 export default function RootLayout({
