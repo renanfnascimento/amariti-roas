@@ -4,77 +4,87 @@ import React, { useState } from 'react'
 import { AppLayout } from '@/components/layout/AppLayout'
 import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogClose } from '@/components/ui/dialog'
-import { Calendar as CalendarIcon, LayoutGrid, List, Plus, Edit2, Clock, MapPin, Search, ChevronLeft, ChevronRight, Video, Image as ImageIcon, MessageSquare } from 'lucide-react'
-import { format, addDays, startOfMonth, endOfMonth, startOfWeek, endOfWeek, isSameMonth, isSameDay, subMonths, addMonths } from 'date-fns'
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetTrigger } from '@/components/ui/sheet'
+import { Calendar as CalendarIcon, LayoutGrid, List, Plus, Edit2, Clock, MapPin, Search, ChevronLeft, ChevronRight, Video, Image as ImageIcon, MessageSquare, Wand2, CheckCircle2, AlertCircle } from 'lucide-react'
+import { format, addDays, startOfMonth, endOfMonth, startOfWeek, endOfWeek, isSameMonth, isSameDay, subMonths, addMonths, parseISO } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 
 // TYPES
 type Platform = 'TikTok Shop' | 'Instagram' | 'Facebook'
-type Source = 'Gemini V03' | 'CapCut Pro' | 'Canva Pro'
-type Status = 'Publicado' | 'Agendado' | 'Em Produção' | 'Rascunho' | 'Atrasado' | 'Erro na API'
+type Status = 'Pendente' | 'Gerando no Veo3' | 'Revisão' | 'Agendado'
 
-interface Schedule {
+interface ContentSlot {
   id: string
   title: string
   platform: Platform
-  date: string
-  time: string
-  source: Source
   status: Status
 }
 
-// Generate dates dynamically based on current month so calendar always has events
+interface DailyQuota {
+  date: string // YYYY-MM-DD
+  completed: number
+  total: number // Always 12
+  slots: ContentSlot[]
+}
+
+// MOCK DATA GENERATOR
 const today = new Date()
 const currentMonthStr = format(today, 'yyyy-MM')
 
-const mockSchedules: Schedule[] = [
-  { id: '1', title: 'Review Produto X', platform: 'TikTok Shop', date: `${currentMonthStr}-05`, time: '14:30', source: 'CapCut Pro', status: 'Agendado' },
-  { id: '2', title: 'Dicas de Inverno', platform: 'Instagram', date: `${currentMonthStr}-12`, time: '10:00', source: 'Canva Pro', status: 'Em Produção' },
-  { id: '3', title: 'Vendas Fim de Ano', platform: 'Facebook', date: `${currentMonthStr}-12`, time: '18:00', source: 'Gemini V03', status: 'Erro na API' },
-  { id: '4', title: 'Bastidores Loja', platform: 'Instagram', date: `${currentMonthStr}-18`, time: '09:00', source: 'CapCut Pro', status: 'Publicado' },
-  { id: '5', title: 'Promo Relâmpago', platform: 'TikTok Shop', date: `${currentMonthStr}-25`, time: '12:00', source: 'Canva Pro', status: 'Atrasado' },
-  { id: '6', title: 'Trend Vestido', platform: 'TikTok Shop', date: `${currentMonthStr}-28`, time: '19:00', source: 'CapCut Pro', status: 'Rascunho' },
+const generateDailySlots = (completedCount: number): ContentSlot[] => {
+  const slots: ContentSlot[] = []
+  const platforms: Platform[] = ['TikTok Shop', 'Instagram', 'Facebook']
+  let currentCompleted = 0
+
+  platforms.forEach(platform => {
+    for (let i = 1; i <= 4; i++) {
+      let status: Status = 'Pendente'
+      if (currentCompleted < completedCount) {
+        status = 'Agendado'
+        currentCompleted++
+      } else if (currentCompleted === completedCount && completedCount < 12) {
+        status = 'Gerando no Veo3'
+      }
+
+      slots.push({
+        id: `${platform}-${i}`,
+        title: `Vídeo ${String(i).padStart(2, '0')} - Trend Produto`,
+        platform,
+        status,
+      })
+    }
+  })
+  return slots
+}
+
+const mockQuotas: DailyQuota[] = [
+  { date: `${currentMonthStr}-05`, completed: 12, total: 12, slots: generateDailySlots(12) },
+  { date: `${currentMonthStr}-12`, completed: 12, total: 12, slots: generateDailySlots(12) },
+  { date: `${currentMonthStr}-15`, completed: 0, total: 12, slots: generateDailySlots(0) },
+  { date: format(today, 'yyyy-MM-dd'), completed: 4, total: 12, slots: generateDailySlots(4) }, // Today
+  { date: `${currentMonthStr}-28`, completed: 0, total: 12, slots: generateDailySlots(0) },
 ]
 
 export default function AgendamentosPage() {
-  const [filter, setFilter] = useState<Platform | 'Todos'>('Todos')
-  const [schedules] = useState<Schedule[]>(mockSchedules)
-  const [currentDate, setCurrentDate] = useState(new Date())
-
-  const filteredSchedules = filter === 'Todos' 
-    ? schedules 
-    : schedules.filter(s => s.platform === filter)
-
-  const getStatusColor = (status: Status) => {
-    switch(status) {
-      case 'Publicado':
-      case 'Agendado': return 'bg-green-500'
-      case 'Em Produção':
-      case 'Rascunho': return 'bg-yellow-500'
-      case 'Atrasado':
-      case 'Erro na API': return 'bg-red-500'
-      default: return 'bg-gray-500'
-    }
-  }
+  const [quotas] = useState<DailyQuota[]>(mockQuotas)
+  const [currentDate, setCurrentDate] = useState(today)
+  const [selectedQuota, setSelectedQuota] = useState<DailyQuota | null>(null)
 
   const getStatusBadgeVariant = (status: Status) => {
     switch(status) {
-      case 'Publicado':
       case 'Agendado': return 'success'
-      case 'Em Produção':
-      case 'Rascunho': return 'warning'
-      case 'Atrasado':
-      case 'Erro na API': return 'error'
+      case 'Gerando no Veo3': return 'warning'
+      case 'Revisão': return 'default'
+      case 'Pendente': return 'error'
       default: return 'default'
     }
   }
 
   const getPlatformIcon = (platform: Platform) => {
     switch(platform) {
-      case 'TikTok Shop': return <Video size={10} className="mr-1" />
-      case 'Instagram': return <ImageIcon size={10} className="mr-1" />
-      case 'Facebook': return <MessageSquare size={10} className="mr-1" />
+      case 'TikTok Shop': return <Video size={14} className="text-pink-400" />
+      case 'Instagram': return <ImageIcon size={14} className="text-emerald-400" />
+      case 'Facebook': return <MessageSquare size={14} className="text-blue-400" />
     }
   }
 
@@ -94,63 +104,6 @@ export default function AgendamentosPage() {
   const prevMonth = () => setCurrentDate(subMonths(currentDate, 1))
   const nextMonth = () => setCurrentDate(addMonths(currentDate, 1))
 
-  // --- REUSABLE EDIT DIALOG ---
-  const EditScheduleDialog = ({ schedule, children }: { schedule: Schedule, children: React.ReactNode }) => (
-    <Dialog>
-      <DialogTrigger asChild>
-        {children}
-      </DialogTrigger>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>Editar Agendamento</DialogTitle>
-        </DialogHeader>
-        <div className="space-y-4 py-4">
-          <div className="space-y-2">
-            <label className="text-sm font-medium text-gray-300">Título do Vídeo</label>
-            <input type="text" defaultValue={schedule.title} className="w-full bg-black/20 border border-white/10 rounded-md py-2 px-3 text-white focus:outline-none focus:border-indigo-500" />
-          </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-gray-300">Data</label>
-              <input type="date" defaultValue={schedule.date} className="w-full bg-black/20 border border-white/10 rounded-md py-2 px-3 text-white focus:outline-none focus:border-indigo-500" />
-            </div>
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-gray-300">Hora</label>
-              <input type="time" defaultValue={schedule.time} className="w-full bg-black/20 border border-white/10 rounded-md py-2 px-3 text-white focus:outline-none focus:border-indigo-500" />
-            </div>
-          </div>
-          <div className="space-y-2">
-            <label className="text-sm font-medium text-gray-300">Status</label>
-            <select defaultValue={schedule.status} className="w-full bg-[#1a1a24] border border-white/10 rounded-md py-2 px-3 text-white focus:outline-none focus:border-indigo-500">
-              <option value="Agendado">Agendado</option>
-              <option value="Em Produção">Em Produção</option>
-              <option value="Rascunho">Rascunho</option>
-              <option value="Publicado">Publicado</option>
-              <option value="Atrasado">Atrasado</option>
-              <option value="Erro na API">Erro na API</option>
-            </select>
-          </div>
-          <div className="space-y-2">
-            <label className="text-sm font-medium text-gray-300">Plataforma</label>
-            <select defaultValue={schedule.platform} className="w-full bg-[#1a1a24] border border-white/10 rounded-md py-2 px-3 text-white focus:outline-none focus:border-indigo-500">
-              <option value="Instagram">Instagram</option>
-              <option value="TikTok Shop">TikTok Shop</option>
-              <option value="Facebook">Facebook</option>
-            </select>
-          </div>
-          <div className="pt-4 flex justify-end gap-2">
-            <DialogClose asChild>
-              <button className="px-4 py-2 text-sm font-medium text-gray-300 hover:text-white transition-colors">Cancelar</button>
-            </DialogClose>
-            <DialogClose asChild>
-              <button className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-md text-sm font-medium transition-colors">Salvar Alterações</button>
-            </DialogClose>
-          </div>
-        </div>
-      </DialogContent>
-    </Dialog>
-  )
-
   return (
     <AppLayout>
       <div className="flex flex-col gap-6 h-full">
@@ -158,30 +111,13 @@ export default function AgendamentosPage() {
         {/* HEADER & CONTROLS */}
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 shrink-0">
           <div>
-            <h1 className="text-3xl font-bold text-white tracking-tight">Calendário de Conteúdo</h1>
-            <p className="text-gray-400 mt-1">Gerencie, agende e edite suas postagens em todas as redes.</p>
+            <h1 className="text-3xl font-bold text-white tracking-tight">Calendário de Quotas (Alta Produção)</h1>
+            <p className="text-gray-400 mt-1">Gerencie a meta diária de 12 vídeos (TikTok, IG, FB) gerados por IA.</p>
           </div>
           <button className="bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2.5 rounded-md flex items-center gap-2 font-medium transition-colors shadow-lg shadow-indigo-500/20">
             <Plus size={18} />
-            Agendar Novo Vídeo
+            Agendar Massa
           </button>
-        </div>
-
-        {/* FILTERS */}
-        <div className="flex flex-wrap items-center gap-2 shrink-0">
-          {['Todos', 'TikTok Shop', 'Instagram', 'Facebook'].map((item) => (
-            <button
-              key={item}
-              onClick={() => setFilter(item as Platform | 'Todos')}
-              className={`px-4 py-1.5 rounded-full text-sm font-medium transition-all ${
-                filter === item 
-                  ? 'bg-white/20 text-white shadow-sm ring-1 ring-white/10' 
-                  : 'text-gray-400 hover:text-white hover:bg-white/10'
-              }`}
-            >
-              {item}
-            </button>
-          ))}
         </div>
 
         {/* MAIN VIEW (TABS) */}
@@ -189,14 +125,14 @@ export default function AgendamentosPage() {
           <div className="flex items-center justify-between mb-4 shrink-0">
             <TabsList className="bg-white/5 border border-white/5">
               <TabsTrigger value="calendar" className="gap-2">
-                <CalendarIcon size={16} /> Visão Calendário
+                <CalendarIcon size={16} /> Visão Quotas
               </TabsTrigger>
-              <TabsTrigger value="list" className="gap-2">
-                <List size={16} /> Visão Lista
+              <TabsTrigger value="list" className="gap-2" disabled>
+                <List size={16} /> Visão Lista (Desativada)
               </TabsTrigger>
             </TabsList>
             
-            {/* Calendar Controls (Only visible typically on calendar view via CSS if we wanted, but putting it globally for simplicity or within the tab content) */}
+            {/* Calendar Controls */}
             <div className="flex items-center gap-4">
               <button onClick={prevMonth} className="p-1.5 bg-white/5 hover:bg-white/10 rounded-md text-white transition-colors">
                 <ChevronLeft size={18} />
@@ -227,94 +163,114 @@ export default function AgendamentosPage() {
                 const isCurrentMonth = isSameMonth(day, monthStart)
                 const isToday = isSameDay(day, today)
                 
-                // Get events for this day
-                const dayEvents = filteredSchedules.filter(s => s.date === dayStr)
-                // Limit to max 3 events to show, others behind +N
-                const visibleEvents = dayEvents.slice(0, 3)
-                const hiddenEventsCount = dayEvents.length - 3
+                // Get quota for this day
+                const quota = quotas.find(q => q.date === dayStr) || { date: dayStr, completed: 0, total: 12, slots: generateDailySlots(0) }
+                
+                // Determine health visual
+                let healthClass = "border-white/5 hover:bg-white/5"
+                let textColor = "text-gray-400"
+                if (quota.completed === 12) {
+                  healthClass = "bg-green-500/10 border-green-500/20 hover:bg-green-500/20"
+                  textColor = "text-green-400"
+                } else if (quota.completed > 0) {
+                  healthClass = "bg-yellow-500/10 border-yellow-500/20 hover:bg-yellow-500/20"
+                  textColor = "text-yellow-400"
+                } else if (isSameMonth(day, today) && day < today) {
+                  // Past day empty = red
+                  healthClass = "bg-red-500/5 border-red-500/20 hover:bg-red-500/10"
+                  textColor = "text-red-400"
+                }
 
                 return (
-                  <div 
-                    key={day.toString()} 
-                    className={`min-h-[120px] p-2 border-r border-b border-white/5 relative flex flex-col gap-1 transition-colors hover:bg-white/5 ${
-                      !isCurrentMonth ? 'bg-black/40 opacity-50' : ''
-                    }`}
-                  >
-                    <div className="flex justify-between items-start mb-1">
-                      <span className={`text-xs font-medium w-6 h-6 flex items-center justify-center rounded-full ${
-                        isToday ? 'bg-indigo-600 text-white' : 'text-gray-400'
-                      }`}>
-                        {format(day, 'd')}
-                      </span>
-                    </div>
-
-                    {/* MICRO UI EVENTS */}
-                    <div className="flex flex-col gap-1.5 flex-1 overflow-y-auto custom-scrollbar pr-1">
-                      {visibleEvents.map(event => (
-                        <EditScheduleDialog key={event.id} schedule={event}>
-                          <div className={`text-left w-full group cursor-pointer flex items-center bg-[#151521] border border-white/10 rounded pl-1.5 pr-2 py-1 hover:border-indigo-500/50 transition-all relative overflow-hidden`}>
-                            {/* Color Bar */}
-                            <div className={`absolute left-0 top-0 bottom-0 w-1 ${getStatusColor(event.status)}`} />
-                            
-                            <div className="flex items-center truncate pl-1">
-                              {getPlatformIcon(event.platform)}
-                              <span className="text-[10px] font-medium text-gray-300 truncate group-hover:text-white transition-colors">
-                                {event.time} - {event.title}
-                              </span>
-                            </div>
-                          </div>
-                        </EditScheduleDialog>
-                      ))}
-
-                      {hiddenEventsCount > 0 && (
-                        <div className="text-[10px] text-gray-500 font-medium px-1 text-center mt-1">
-                          + {hiddenEventsCount} a mais
+                  <Sheet key={day.toString()}>
+                    <SheetTrigger asChild>
+                      <div 
+                        onClick={() => setSelectedQuota(quota)}
+                        className={`min-h-[120px] p-3 border-r border-b relative flex flex-col transition-all cursor-pointer group ${healthClass} ${!isCurrentMonth ? 'opacity-30 pointer-events-none' : ''}`}
+                      >
+                        <div className="flex justify-between items-start mb-2">
+                          <span className={`text-sm font-bold w-7 h-7 flex items-center justify-center rounded-full ${
+                            isToday ? 'bg-indigo-600 text-white' : 'text-gray-300 group-hover:text-white'
+                          }`}>
+                            {format(day, 'd')}
+                          </span>
                         </div>
-                      )}
-                    </div>
-                  </div>
+
+                        {/* QUOTA SUMMARY UI */}
+                        <div className="mt-auto flex flex-col items-center justify-center py-2 bg-black/40 rounded-lg border border-white/5 group-hover:border-white/20 transition-colors">
+                          <div className="text-2xl font-bold tracking-tighter flex items-baseline gap-1">
+                            <span className={textColor}>{quota.completed}</span>
+                            <span className="text-gray-500 text-sm font-medium">/12</span>
+                          </div>
+                          <span className="text-[10px] text-gray-500 font-semibold uppercase mt-1 tracking-wider">
+                            Vídeos Prontos
+                          </span>
+                        </div>
+                        
+                        {/* Progress bar visual */}
+                        <div className="w-full h-1 bg-black/50 rounded-full mt-3 overflow-hidden">
+                          <div 
+                            className={`h-full ${quota.completed === 12 ? 'bg-green-500' : quota.completed > 0 ? 'bg-yellow-500' : 'bg-red-500/50'}`}
+                            style={{ width: `${(quota.completed / 12) * 100}%` }}
+                          />
+                        </div>
+                      </div>
+                    </SheetTrigger>
+
+                    {/* DAILY PRODUCTION SHEET */}
+                    {selectedQuota && (
+                      <SheetContent className="w-[400px] sm:w-[600px] flex flex-col border-l border-white/10 bg-[#151521]/95 backdrop-blur-xl p-0">
+                        <div className="p-6 border-b border-white/10 flex-shrink-0 bg-black/20">
+                          <SheetHeader>
+                            <SheetTitle className="text-2xl text-white">Produção do Dia</SheetTitle>
+                            <SheetDescription className="text-base text-gray-400 mt-1 flex items-center justify-between">
+                              <span>{format(parseISO(selectedQuota.date), "EEEE, d 'de' MMMM", { locale: ptBR })}</span>
+                              <span className="font-bold text-white px-3 py-1 bg-white/10 rounded-full">
+                                {selectedQuota.completed} / 12 Prontos
+                              </span>
+                            </SheetDescription>
+                          </SheetHeader>
+                        </div>
+
+                        <div className="flex-1 overflow-y-auto p-6 space-y-8 custom-scrollbar">
+                          {['TikTok Shop', 'Instagram', 'Facebook'].map(platform => {
+                            const platformSlots = selectedQuota.slots.filter(s => s.platform === platform)
+                            return (
+                              <div key={platform} className="space-y-3">
+                                <div className="flex items-center gap-2 pb-2 border-b border-white/10">
+                                  {getPlatformIcon(platform as Platform)}
+                                  <h3 className="font-semibold text-white">{platform}</h3>
+                                  <span className="text-xs text-gray-500 ml-auto">4 Slots</span>
+                                </div>
+                                
+                                <div className="space-y-2">
+                                  {platformSlots.map(slot => (
+                                    <div key={slot.id} className="glass-card p-3 rounded-lg flex items-center justify-between group hover:border-indigo-500/30 transition-colors">
+                                      <div className="flex flex-col gap-1">
+                                        <span className="text-sm font-medium text-gray-200 group-hover:text-white transition-colors">{slot.title}</span>
+                                        <Badge variant={getStatusBadgeVariant(slot.status)} className="w-fit text-[10px] px-1.5 py-0">
+                                          {slot.status}
+                                        </Badge>
+                                      </div>
+                                      
+                                      <button className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600/20 hover:bg-indigo-600 text-indigo-300 hover:text-white text-xs font-semibold rounded transition-all border border-indigo-500/30 hover:border-indigo-500">
+                                        <Wand2 size={12} />
+                                        Gerar Script Veo3
+                                      </button>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            )
+                          })}
+                        </div>
+                      </SheetContent>
+                    )}
+                  </Sheet>
                 )
               })}
             </div>
           </TabsContent>
-
-          <TabsContent value="list" className="space-y-4 m-0">
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-              {filteredSchedules.map(schedule => (
-                <div key={schedule.id} className="glass-card rounded-xl p-5 group flex flex-col gap-4 relative overflow-hidden transition-all hover:border-white/10">
-                  <div className="flex justify-between items-start">
-                    <Badge variant={getStatusBadgeVariant(schedule.status)}>{schedule.status}</Badge>
-                    
-                    <EditScheduleDialog schedule={schedule}>
-                      <button className="text-gray-400 hover:text-white transition-colors bg-white/5 p-1.5 rounded-md hover:bg-white/10">
-                        <Edit2 size={14} />
-                      </button>
-                    </EditScheduleDialog>
-                  </div>
-
-                  <div>
-                    <h3 className="font-semibold text-lg text-white mb-1 line-clamp-1">{schedule.title}</h3>
-                    <p className="text-sm text-gray-400 flex items-center gap-1.5">
-                      <MapPin size={14} /> {schedule.platform} • {schedule.source}
-                    </p>
-                  </div>
-
-                  <div className="flex items-center gap-2 text-sm text-gray-300 mt-2 bg-white/5 w-fit px-3 py-1.5 rounded-md border border-white/5">
-                    <Clock size={14} className="text-indigo-400" />
-                    <span>{schedule.date} às {schedule.time}</span>
-                  </div>
-                </div>
-              ))}
-              
-              {filteredSchedules.length === 0 && (
-                <div className="col-span-full py-12 flex flex-col items-center justify-center text-gray-400 border border-dashed border-white/10 rounded-xl">
-                  <Search size={40} className="mb-4 opacity-50" />
-                  <p>Nenhum agendamento encontrado para esta visão.</p>
-                </div>
-              )}
-            </div>
-          </TabsContent>
-
         </Tabs>
       </div>
     </AppLayout>
